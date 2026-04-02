@@ -17,6 +17,17 @@ from app.services.geoip import geoip_service
 
 logger = logging.getLogger(__name__)
 
+
+def _parse_timestamp(ts_str: str) -> datetime:
+    """Parse an ISO-8601 timestamp string robustly, handling both 'Z' and '+00:00'."""
+    # Python 3.11+ supports 'Z' natively; earlier versions do not
+    try:
+        return datetime.fromisoformat(ts_str)
+    except ValueError:
+        # Fallback: replace trailing Z with +00:00 for Python < 3.11
+        return datetime.fromisoformat(ts_str.rstrip("Z") + "+00:00")
+
+
 # Severity bonus per attack type (added to base score)
 _SEVERITY_BONUS: Dict[str, int] = {
     "ZeroDay": 3,
@@ -184,7 +195,7 @@ class AttackProcessor:
                 for ev in batch:
                     ts = ev.get("timestamp")
                     if isinstance(ts, str):
-                        ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                        ts = _parse_timestamp(ts)
                     row = AttackEvent(
                         source_ip=ev.get("source_ip", "0.0.0.0"),
                         dest_ip=ev.get("dest_ip", "0.0.0.0"),

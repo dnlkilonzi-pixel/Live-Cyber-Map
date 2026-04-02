@@ -61,8 +61,7 @@ class AnomalyDetector:
             self._second_buckets.append(self._current_bucket_count)
             # Fill any gap seconds with 0
             gap = current_second - self._current_second - 1
-            for _ in range(min(gap, _WINDOW_SECONDS)):
-                self._second_buckets.append(0)
+            self._second_buckets.extend([0] * min(gap, _WINDOW_SECONDS))
             self._current_second = current_second
             self._current_bucket_count = 0
         self._current_bucket_count += 1

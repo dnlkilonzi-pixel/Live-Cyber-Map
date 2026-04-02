@@ -99,7 +99,9 @@ class AttackGenerator:
         dst_weights = [
             w for c, w in _TARGET_COUNTRIES_WEIGHTED if c != src_code
         ]
-        dst_code = random.choices(dst_candidates, weights=dst_weights or [1] * len(dst_candidates), k=1)[0]
+        if not dst_weights:
+            dst_weights = [1] * len(dst_candidates)
+        dst_code = random.choices(dst_candidates, weights=dst_weights, k=1)[0]
 
         src_ip = geoip_service.get_random_ip_for_country(src_code)
         dst_ip = geoip_service.get_random_ip_for_country(dst_code)
