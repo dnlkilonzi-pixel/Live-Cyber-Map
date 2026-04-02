@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+dist/
+*.egg
+
+# Environment
+.env
+!.env.example
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+.npm/
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Data volumes
+postgres_data/
+redis_data/
