@@ -12,7 +12,7 @@ Place screenshots of the application here. The following files are referenced in
 
 ## How to capture screenshots
 
-1. Start the app: `docker-compose up --build`
+1. Start the app: `docker-compose up --build` (or `docker compose up --build` on Docker v2)
 2. Open `http://localhost:80` in a browser
 3. Wait ~30 seconds for the globe to populate with live attack arcs
 4. Use your OS screenshot tool or browser DevTools to capture each view
