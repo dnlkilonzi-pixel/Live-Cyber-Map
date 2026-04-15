@@ -255,3 +255,31 @@ async def ollama_reset():
     from app.services.ollama_service import ollama_service
     await ollama_service.reset_probe()
     return {"status": "probe reset"}
+
+
+@router.post(
+    "/ollama/pull",
+    tags=["intelligence"],
+    summary="Pull a model into the local Ollama instance",
+)
+async def ollama_pull(model_name: str):
+    """Trigger `ollama pull <model_name>`. Returns immediately; the pull runs asynchronously."""
+    from app.services.ollama_service import ollama_service
+    success = await ollama_service.pull_model(model_name)
+    if success:
+        await ollama_service.reset_probe()
+    return {"status": "pull_initiated" if success else "pull_failed", "model": model_name}
+
+
+@router.post(
+    "/ollama/select",
+    tags=["intelligence"],
+    summary="Switch the active Ollama model",
+)
+async def ollama_select_model(model_name: str):
+    """Change the active model used for brief generation."""
+    import os
+    from app.services import ollama_service as ollama_module
+    ollama_module.OLLAMA_MODEL = model_name
+    ollama_module.ollama_service._available = None  # reset probe
+    return {"status": "model_changed", "model": model_name}

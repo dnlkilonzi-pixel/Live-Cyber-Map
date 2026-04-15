@@ -1,10 +1,12 @@
-"""Financial data service – stocks, crypto, and commodities.
+"""Financial data service – stocks, crypto, commodities, and forex.
 
 Data sources (all free, no API keys required):
-  - CoinGecko public API  (crypto)
-  - Yahoo Finance API     (stocks via yfinance-compatible endpoint)
-  - Simulated commodities with realistic drift
+  - CoinGecko public API  (crypto – live)
+  - Yahoo Finance via yfinance (stocks & indices – live with simulation fallback)
+  - open.er-api.com (forex – live with simulation fallback)
+  - Simulated commodities with realistic drift (labelled is_real=False)
 
+All real quotes include is_real=True; simulated data is is_real=False.
 Results cached with short TTLs to avoid rate limits.
 """
 
@@ -42,6 +44,7 @@ class TickerQuote:
     asset_class: str        # "stock" | "crypto" | "commodity" | "index" | "forex"
     exchange: Optional[str]
     last_updated: float     # Unix timestamp
+    is_real: bool = False   # True when backed by a live API; False when simulated
 
 
 @dataclass
@@ -217,13 +220,26 @@ class FinancialDataService:
             try:
                 await asyncio.gather(
                     self._fetch_crypto(),
+                    self._fetch_stocks_yfinance(),
+                    self._fetch_indices_yfinance(),
+                    self._fetch_forex_exchangerate(),
                     self._update_simulated_commodities(),
-                    self._update_simulated_forex(),
-                    self._update_simulated_stocks(),
                 )
+                # Persist a sample of real quotes every cycle
+                async with self._lock:
+                    all_real = [
+                        q for group in [
+                            self._market.indices,
+                            self._market.stocks,
+                            self._market.forex,
+                        ]
+                        for q in group if q.is_real
+                    ]
+                if all_real:
+                    asyncio.create_task(self._persist_financial_snapshot(all_real))
             except Exception as exc:
                 logger.warning("Financial data fetch error: %s", exc)
-            await asyncio.sleep(self.CRYPTO_TTL)
+            await asyncio.sleep(self.STOCK_TTL)
 
     # ------------------------------------------------------------------
     # CoinGecko crypto (free, no key)
@@ -283,6 +299,185 @@ class FinancialDataService:
                 q.change = round(q.price * drift, 4)
                 q.change_pct = round(drift * 100, 2)
                 q.last_updated = time.time()
+
+    # ------------------------------------------------------------------
+    # Yahoo Finance via yfinance (stocks + indices)
+    # ------------------------------------------------------------------
+
+    async def _fetch_stocks_yfinance(self) -> None:
+        """Fetch real stock prices via yfinance (runs sync code in executor)."""
+        symbols = [s for s, _, _ in STOCK_SYMBOLS]
+        quotes = await asyncio.get_event_loop().run_in_executor(
+            None, self._yfinance_fetch, symbols, "stock"
+        )
+        if quotes:
+            async with self._lock:
+                # Merge with existing (keep simulated entries if yfinance misses them)
+                sym_map = {q.symbol: q for q in quotes}
+                updated = [sym_map.get(q.symbol, q) for q in self._market.stocks]
+                self._market.stocks = updated
+                self._market.last_updated = time.time()
+            logger.debug("yfinance: updated %d stock quotes", len(quotes))
+        else:
+            await self._update_simulated_stocks()
+
+    async def _persist_financial_snapshot(self, quotes: "List[TickerQuote]") -> None:
+        """Persist a batch of financial quotes to PostgreSQL."""
+        try:
+            from app.core.database import AsyncSessionLocal
+            from app.models.financial import FinancialSnapshot
+            async with AsyncSessionLocal() as session:
+                for q in quotes:
+                    session.add(FinancialSnapshot(
+                        symbol=q.symbol,
+                        asset_class=q.asset_class,
+                        price=q.price,
+                        change_pct=q.change_pct,
+                        is_real=q.is_real,
+                    ))
+                await session.commit()
+        except Exception as exc:
+            logger.debug("Financial persistence error: %s", exc)
+
+    async def _fetch_indices_yfinance(self) -> None:
+        """Fetch real index prices via yfinance."""
+        symbols = [s for s, _, _ in INDEX_SYMBOLS]
+        quotes = await asyncio.get_event_loop().run_in_executor(
+            None, self._yfinance_fetch, symbols, "index"
+        )
+        if quotes:
+            async with self._lock:
+                sym_map = {q.symbol: q for q in quotes}
+                updated = [sym_map.get(q.symbol, q) for q in self._market.indices]
+                self._market.indices = updated
+                self._market.last_updated = time.time()
+            logger.debug("yfinance: updated %d index quotes", len(quotes))
+        else:
+            await self._update_simulated_stocks()
+
+    def _yfinance_fetch(self, symbols: List[str], asset_class: str) -> List[TickerQuote]:
+        """Synchronous yfinance download – run in a thread executor."""
+        try:
+            import yfinance as yf  # type: ignore[import]
+            data = yf.download(
+                tickers=symbols,
+                period="2d",
+                interval="1d",
+                group_by="ticker",
+                auto_adjust=True,
+                progress=False,
+                threads=True,
+            )
+            quotes: List[TickerQuote] = []
+            sym_info: Dict[str, Tuple[str, str]] = {}
+            # Map symbol → (name, exchange) from the appropriate list
+            for src in [STOCK_SYMBOLS, INDEX_SYMBOLS]:
+                for row in src:
+                    sym_info[row[0]] = (row[1], row[2])
+
+            for sym in symbols:
+                try:
+                    if len(symbols) == 1:
+                        df = data
+                    else:
+                        df = data[sym] if sym in data.columns.get_level_values(0) else data
+
+                    if df.empty or len(df) < 1:
+                        continue
+
+                    close_col = "Close"
+                    row_today = df.iloc[-1]
+                    price = float(row_today[close_col])
+                    if math.isnan(price) or price <= 0:
+                        continue
+
+                    prev_price = price
+                    if len(df) >= 2:
+                        prev = float(df.iloc[-2][close_col])
+                        if not math.isnan(prev) and prev > 0:
+                            prev_price = prev
+
+                    change = price - prev_price
+                    change_pct = (change / prev_price * 100) if prev_price > 0 else 0.0
+                    name, exchange = sym_info.get(sym, (sym, ""))
+                    volume = float(row_today.get("Volume", 0) or 0)
+                    quotes.append(
+                        TickerQuote(
+                            symbol=sym,
+                            name=name,
+                            price=round(price, 2),
+                            change=round(change, 2),
+                            change_pct=round(change_pct, 2),
+                            volume=volume if volume > 0 else None,
+                            market_cap=None,
+                            high_24h=float(row_today.get("High", price)),
+                            low_24h=float(row_today.get("Low", price)),
+                            asset_class=asset_class,
+                            exchange=exchange,
+                            last_updated=time.time(),
+                            is_real=True,
+                        )
+                    )
+                except Exception as sym_exc:
+                    logger.debug("yfinance symbol %s error: %s", sym, sym_exc)
+            return quotes
+        except Exception as exc:
+            logger.debug("yfinance batch download failed: %s", exc)
+            return []
+
+    # ------------------------------------------------------------------
+    # Exchangerate.host (forex – free, no key)
+    # ------------------------------------------------------------------
+
+    async def _fetch_forex_exchangerate(self) -> None:
+        """Fetch live forex rates from open.er-api.com (free, no key required)."""
+        url = "https://open.er-api.com/v6/latest/USD"
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    rates: Dict[str, float] = data.get("rates", {})
+                    if rates:
+                        await self._apply_forex_rates(rates)
+                        return
+        except Exception as exc:
+            logger.debug("Exchangerate fetch failed: %s", exc)
+        # Fallback to simulation
+        await self._update_simulated_forex()
+
+    async def _apply_forex_rates(self, rates: Dict[str, float]) -> None:
+        """Apply real forex rates to the market forex list."""
+        now = time.time()
+        # Build a currency → USD rate lookup
+        async with self._lock:
+            for q in self._market.forex:
+                pair = q.symbol  # e.g. "EUR/USD"
+                parts = pair.split("/")
+                if len(parts) != 2:
+                    continue
+                base, quote = parts
+                try:
+                    if base == "USD":
+                        rate = rates.get(quote)
+                    elif quote == "USD":
+                        base_rate = rates.get(base)
+                        rate = (1.0 / base_rate) if base_rate else None
+                    else:
+                        rate_base = rates.get(base)
+                        rate_quote = rates.get(quote)
+                        rate = (rate_quote / rate_base) if (rate_base and rate_quote) else None
+
+                    if rate and not math.isnan(rate):
+                        prev = q.price
+                        q.price = round(rate, 6)
+                        q.change = round(q.price - prev, 6)
+                        q.change_pct = round((q.price - prev) / prev * 100, 4) if prev else 0.0
+                        q.last_updated = now
+                        q.is_real = True
+                        self._forex_prices[q.symbol] = rate
+                except Exception:
+                    pass
 
     # ------------------------------------------------------------------
     # Simulated stocks (realistic random walk seeded from actual levels)
@@ -478,6 +673,7 @@ class FinancialDataService:
             "asset_class": q.asset_class,
             "exchange": q.exchange,
             "last_updated": q.last_updated,
+            "is_real": q.is_real,
         }
 
 

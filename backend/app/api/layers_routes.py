@@ -252,6 +252,18 @@ LAYER_REGISTRY: Dict[str, Dict[str, Any]] = {
         "name": "Drug Trafficking Routes", "description": "UNODC major drug trafficking corridors",
         "icon": "💊", "color": "#880e4f", "live": False,
     },
+    # ---- Transport (real data) ----
+    "flight_tracking": {
+        "id": "flight_tracking", "category": "transport",
+        "name": "Live Flight Tracking", "description": "Real-time aircraft positions (OpenSky Network)",
+        "icon": "✈️", "color": "#29b6f6", "live": True,
+    },
+    # ---- Weather (real data) ----
+    "weather": {
+        "id": "weather", "category": "environment",
+        "name": "Live Weather", "description": "Current conditions for major cities (Open-Meteo)",
+        "icon": "🌦️", "color": "#4fc3f7", "live": True,
+    },
 }
 
 
@@ -354,6 +366,8 @@ async def _generate_layer_data(layer_id: str, limit: int) -> List[LayerFeature]:
         "terrorist_incidents": _terrorist_incidents_data,
         "piracy": _piracy_data,
         "submarine_cables": _submarine_cables_data,
+        "flight_tracking": _flight_tracking_data,
+        "weather": _weather_data,
     }
 
     gen = generators.get(layer_id)
@@ -431,27 +445,57 @@ async def _military_bases_data(limit: int) -> List[LayerFeature]:
 
 
 async def _earthquakes_data(limit: int) -> List[LayerFeature]:
-    """Simulated recent earthquakes (M4.0–8.0)."""
-    # Major seismic belt coordinates
+    """Real earthquake data from USGS GeoJSON feed (free, no key required)."""
+    url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson"
+    try:
+        import httpx as _httpx
+        async with _httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                features: List[LayerFeature] = []
+                for feat in data.get("features", [])[:limit]:
+                    props = feat.get("properties", {})
+                    coords = feat.get("geometry", {}).get("coordinates", [0, 0, 0])
+                    mag = props.get("mag", 0) or 0
+                    place = props.get("place", "Unknown") or "Unknown"
+                    features.append(LayerFeature(
+                        id=feat.get("id", f"eq_{len(features)}"),
+                        lat=round(coords[1], 4),
+                        lng=round(coords[0], 4),
+                        value=round(max(0.0, min(1.0, (mag - 2.5) / 5.5)), 2),
+                        label=f"M{mag:.1f} – {place}",
+                        extra={
+                            "magnitude": round(mag, 1),
+                            "depth_km": round(coords[2], 1) if len(coords) > 2 else None,
+                            "time": props.get("time"),
+                            "url": props.get("url", ""),
+                            "is_real": True,
+                        },
+                    ))
+                return features
+    except Exception as exc:
+        logger.debug("USGS earthquake fetch failed: %s", exc)
+    # Fallback: simulated data
     belt = [
         (35.0, 137.0), (-6.0, 105.0), (40.0, 142.0), (-15.0, -75.0),
         (38.0, 30.0), (28.0, 84.0), (4.0, 97.0), (-40.0, 174.0),
         (36.0, -118.0), (19.5, -155.5), (15.0, -90.0), (-33.0, -71.0),
         (60.0, -153.0), (5.0, 125.0),
     ]
-    features = []
+    fallback = []
     for i in range(min(limit, 40)):
         base_lat, base_lng = belt[i % len(belt)]
         lat = base_lat + random.gauss(0, 3)
         lng = base_lng + random.gauss(0, 3)
-        magnitude = random.uniform(4.0, 7.5)
-        features.append(LayerFeature(
-            id=f"eq_{i}", lat=round(lat, 2), lng=round(lng, 2),
-            value=round((magnitude - 4) / 4, 2),
-            label=f"M{magnitude:.1f}",
-            extra={"magnitude": round(magnitude, 1), "depth_km": random.randint(5, 200)},
+        magnitude = random.uniform(2.5, 7.5)
+        fallback.append(LayerFeature(
+            id=f"eq_sim_{i}", lat=round(lat, 2), lng=round(lng, 2),
+            value=round((magnitude - 2.5) / 5.5, 2),
+            label=f"M{magnitude:.1f} (simulated)",
+            extra={"magnitude": round(magnitude, 1), "is_real": False},
         ))
-    return features
+    return fallback
 
 
 async def _wildfires_data(limit: int) -> List[LayerFeature]:
@@ -600,3 +644,135 @@ def _random_points(
         )
         for i in range(count)
     ]
+
+
+# ---------------------------------------------------------------------------
+# Real-data layer handlers: OpenSky (flights) + Open-Meteo (weather)
+# ---------------------------------------------------------------------------
+
+async def _flight_tracking_data(limit: int) -> List[LayerFeature]:
+    """Live flight positions from OpenSky Network (anonymous, free tier)."""
+    # Limit to a bounding box to keep response size manageable
+    url = "https://opensky-network.org/api/states/all?lamin=-60&lomin=-180&lamax=75&lomax=180"
+    try:
+        import httpx as _httpx
+        # OpenSky allows ~100 anonymous requests/day; use a short timeout
+        async with _httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url, headers={"User-Agent": "GlobalIntelDashboard/2.0"})
+            if resp.status_code == 200:
+                data = resp.json()
+                states = data.get("states") or []
+                features: List[LayerFeature] = []
+                for state in states[:limit]:
+                    # OpenSky state vector: [icao24, callsign, origin_country,
+                    #   time_pos, last_contact, longitude, latitude, baro_altitude,
+                    #   on_ground, velocity, heading, vertical_rate, ...]
+                    if not state or len(state) < 9:
+                        continue
+                    lng = state[5]
+                    lat = state[6]
+                    if lat is None or lng is None:
+                        continue
+                    callsign = (state[1] or "").strip() or state[0]
+                    country = state[2] or "?"
+                    altitude = state[7] or 0
+                    velocity = state[9] or 0
+                    on_ground = state[8]
+                    if on_ground:
+                        continue
+                    features.append(LayerFeature(
+                        id=state[0],
+                        lat=round(lat, 4),
+                        lng=round(lng, 4),
+                        value=min(1.0, (altitude or 0) / 12000),
+                        label=f"✈ {callsign} ({country})",
+                        extra={
+                            "callsign": callsign,
+                            "country": country,
+                            "altitude_m": round(altitude, 0),
+                            "velocity_ms": round(velocity, 1),
+                            "is_real": True,
+                        },
+                    ))
+                return features
+    except Exception as exc:
+        logger.debug("OpenSky fetch failed: %s", exc)
+    # Fallback
+    return _random_points("flights", min(limit, 50))
+
+
+# Major city lat/lng for weather sampling
+_WEATHER_CITIES = [
+    (40.7, -74.0, "New York"), (51.5, -0.1, "London"), (48.9, 2.3, "Paris"),
+    (52.5, 13.4, "Berlin"), (35.7, 139.7, "Tokyo"), (39.9, 116.4, "Beijing"),
+    (28.6, 77.2, "New Delhi"), (-23.5, -46.6, "São Paulo"), (55.8, 37.6, "Moscow"),
+    (-33.9, 18.4, "Cape Town"), (1.3, 103.8, "Singapore"), (25.2, 55.3, "Dubai"),
+    (37.6, -122.4, "San Francisco"), (-37.8, 144.9, "Melbourne"), (19.4, -99.1, "Mexico City"),
+    (41.0, 28.9, "Istanbul"), (31.0, 35.2, "Tel Aviv"), (24.7, 46.7, "Riyadh"),
+]
+
+
+async def _weather_data(limit: int) -> List[LayerFeature]:
+    """Live weather data from Open-Meteo (free, no key required)."""
+    cities = _WEATHER_CITIES[:min(limit, len(_WEATHER_CITIES))]
+    lat_str = ",".join(str(c[0]) for c in cities)
+    lng_str = ",".join(str(c[1]) for c in cities)
+    url = (
+        "https://api.open-meteo.com/v1/forecast"
+        f"?latitude={lat_str}&longitude={lng_str}"
+        "&current=temperature_2m,weather_code,wind_speed_10m"
+        "&timezone=UTC&forecast_days=1"
+    )
+    try:
+        import httpx as _httpx
+        async with _httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                # When multiple locations are requested, response is a list
+                results = data if isinstance(data, list) else [data]
+                features: List[LayerFeature] = []
+                for i, city in enumerate(cities):
+                    if i >= len(results):
+                        break
+                    res = results[i]
+                    cur = res.get("current", {})
+                    temp = cur.get("temperature_2m")
+                    wind = cur.get("wind_speed_10m", 0)
+                    wcode = cur.get("weather_code", 0)
+                    if temp is None:
+                        continue
+                    # Normalize temp to 0–1 (-30°C → 50°C range)
+                    norm = max(0.0, min(1.0, (temp + 30) / 80))
+                    icon = _wmo_icon(wcode)
+                    features.append(LayerFeature(
+                        id=f"wx_{i}",
+                        lat=city[0],
+                        lng=city[1],
+                        value=round(norm, 2),
+                        label=f"{icon} {city[2]}: {temp}°C",
+                        extra={
+                            "city": city[2],
+                            "temperature_c": temp,
+                            "wind_kmh": wind,
+                            "weather_code": wcode,
+                            "is_real": True,
+                        },
+                    ))
+                return features
+    except Exception as exc:
+        logger.debug("Open-Meteo fetch failed: %s", exc)
+    return _random_points("weather", min(limit, 20))
+
+
+def _wmo_icon(code: int) -> str:
+    """Map WMO weather code to an emoji icon."""
+    if code == 0: return "☀️"
+    if code in (1, 2, 3): return "⛅"
+    if code in (45, 48): return "🌫️"
+    if code in range(51, 68): return "🌧️"
+    if code in range(71, 78): return "❄️"
+    if code in range(80, 83): return "🌦️"
+    if code in (95, 96, 99): return "⛈️"
+    return "🌡️"
+

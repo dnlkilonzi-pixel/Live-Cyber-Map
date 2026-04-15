@@ -163,3 +163,23 @@ body {
 .leaflet-container {
   background: #10121c !important;
 }
+
+/* ── Mobile: bottom-sheet panels ────────────────────────── */
+@media (max-width: 768px) {
+  .side-panel,
+  .side-panel-right {
+    position: fixed !important;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto !important;
+    width: 100% !important;
+    max-height: 55vh;
+    border-radius: 16px 16px 0 0;
+    border-right: none !important;
+    border-left: none !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    overflow-y: auto;
+    z-index: 40;
+  }
+}

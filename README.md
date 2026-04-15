@@ -80,53 +80,62 @@ Aggregates news from 40+ sources, synthesizes AI briefs via a local Ollama model
 ## 🏛️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                       CLIENT BROWSER                        │
-│  ┌────────────┐   ┌──────────────┐   ┌───────────────────┐  │
-│  │  3D Globe  │   │  Dashboard   │   │   Attack Feed     │  │
-│  │ (Three.js) │   │  (Stats)     │   │  (Live Events)    │  │
-│  └─────┬──────┘   └──────┬───────┘   └────────┬──────────┘  │
-│        └─────────────────┴────────────────────┘             │
-│                           │ WebSocket                        │
-└───────────────────────────┼──────────────────────────────────┘
-                            │
-                      ┌─────▼──────┐
-                      │   Nginx    │  Reverse Proxy :80
-                      └─────┬──────┘
-             ┌──────────────┴──────────────┐
-             │                             │
-       ┌─────▼─────┐                 ┌─────▼──────┐
-       │  Next.js  │                 │  FastAPI   │
-       │ Frontend  │                 │  Backend   │
-       │  :3000    │                 │   :8000    │
-       └───────────┘                 └──────┬─────┘
-                                            │
-                               ┌────────────┴────────────┐
-                               │                         │
-                         ┌─────▼─────┐             ┌─────▼─────┐
-                         │ PostgreSQL│             │   Redis   │
-                         │  :5432    │             │   :6379   │
-                         └───────────┘             └───────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                          CLIENT BROWSER / TAURI DESKTOP                │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────┐  ┌────────┐  │
+│  │ 3D Globe │  │  2D Map  │  │  Intel   │  │ Financial │  │  Risk  │  │
+│  │ (Three.js│  │ (Leaflet)│  │  Brief   │  │  Ticker   │  │ Panel  │  │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └─────┬─────┘  └───┬────┘  │
+│       └─────────────┴─────────────┴───────────────┴────────────┘       │
+│             WebSocket (attacks, stats, alerts)  /  REST (polls)         │
+└────────────────────────────────────────────────────────────────────────┘
+                                 │
+                           ┌─────▼──────┐
+                           │   Nginx    │  :80 reverse proxy
+                           └─────┬──────┘
+                ┌────────────────┴──────────────────┐
+                │                                   │
+          ┌─────▼─────┐                       ┌─────▼──────┐
+          │  Next.js  │                       │  FastAPI   │
+          │ Frontend  │                       │  Backend   │
+          │  :3000    │                       │   :8000    │
+          └───────────┘                       └──────┬─────┘
+                                        ┌────────────┼────────────┐
+                                        │            │            │
+                                  ┌─────▼─────┐ ┌───▼───┐ ┌──────▼──────┐
+                                  │PostgreSQL │ │ Redis │ │ Ollama (AI) │
+                                  │  :5432    │ │ :6379 │ │  :11434     │
+                                  └───────────┘ └───────┘ └─────────────┘
 ```
 
-### Event Pipeline
+### Backend Services
 
-```
-AttackGenerator ──► asyncio Queue ──► AttackProcessor
-                                            │
-                              ┌─────────────┼─────────────┐
-                              ▼             ▼             ▼
-                         GeoIP Enrich  AnomalyDetect  Cluster Assign
-                                            │
-                                    Redis Pub/Sub
-                                     "attacks" ch
-                                            │
-                               WebSocketManager.broadcast()
-                                            │
-                                  All browser clients
-                                            │
-                                   globe.gl arc render
-```
+| Service | Purpose |
+|---------|---------|
+| `AttackGenerator` | Synthetic cyber-attack event stream |
+| `AttackProcessor` | GeoIP enrichment, anomaly detection, clustering |
+| `WebSocketManager` | Real-time push to all browser clients |
+| `NewsAggregator` | 40+ RSS feeds → Redis cache → PostgreSQL |
+| `CountryRiskService` | Composite risk scores (cyber + news + baseline) |
+| `FinancialDataService` | CoinGecko crypto, yfinance stocks/indices, exchangerate.host forex |
+| `OllamaService` | Local AI brief generation (falls back gracefully) |
+| `AlertService` | Rule evaluation → WebSocket `alert` messages + browser notifications |
+
+### Frontend Panels
+
+| Panel | Trigger | Description |
+|-------|---------|-------------|
+| **Dashboard** | Left sidebar | Events/sec, top attackers/targets, attack-type breakdown |
+| **Attack Feed** | Left sidebar | Live scrolling event log |
+| **Layer Panel** | 🗂️ LAYERS button | Toggle 46 map overlay layers (46 live + simulated) |
+| **Intelligence** | 📰 INTEL button | AI briefs + news feed by category |
+| **Country Risk** | 🌡️ RISK button | Choropleth risk scores for all tracked countries |
+| **Financial Ticker** | 📈 MARKETS button | Stocks, crypto, indices, forex, commodities |
+| **Country Drill-down** | Click globe/map | Risk breakdown, news, markets, active attacks for a country |
+| **Alert Rules** | 🚨 ALERTS button | Create/manage notification rules |
+| **Notifications** | 🔔 Bell icon | In-app alert tray + browser Notification API |
+| **Ollama Settings** | 🤖 AI button | Model list, pull new models, switch active model |
+| **Replay Controls** | ⏮ REPLAY button | Historical attack playback |
 
 ---
 
@@ -136,16 +145,40 @@ AttackGenerator ──► asyncio Queue ──► AttackProcessor
 |-------|------------|
 | **Backend API** | Python 3.11, FastAPI, Uvicorn |
 | **Real-time** | WebSockets, Redis Pub/Sub |
-| **Database** | PostgreSQL 15, SQLAlchemy (async) |
+| **Database** | PostgreSQL 15, SQLAlchemy (async), persistent news/risk/financial tables |
 | **Frontend** | Next.js 14, React 18, TypeScript |
-| **Visualization** | globe.gl, Three.js |
+| **Visualization** | globe.gl, Three.js, Leaflet (from npm, no CDN) |
 | **Styling** | TailwindCSS, Framer Motion |
+| **Local AI** | Ollama (llama3.2, mistral, nomic-embed-text) |
+| **Financial data** | CoinGecko (crypto), yfinance (stocks/indices), open.er-api.com (forex) |
+| **Real layers** | USGS earthquakes, Open-Meteo weather, OpenSky Network flights |
+| **Desktop** | Tauri 1.6 (Rust/WebView) |
 | **Proxy** | Nginx |
 | **Containers** | Docker, Docker Compose |
+| **CI/CD** | GitHub Actions |
 
 ---
 
-## 🚀 Quick Start
+## 🤖 Ollama Setup (Local AI)
+
+Ollama enables AI-synthesized intelligence briefs. It is **optional** — the app falls back to plain text summaries without it.
+
+```bash
+# 1. Install Ollama from https://ollama.ai
+# 2. Start the server
+ollama serve
+
+# 3. Pull a model (3B model fits on most machines with ≥8 GB RAM)
+ollama pull llama3.2:3b
+
+# 4. Variables already set in .env.example
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2:3b
+```
+
+**Click 🤖 AI in the top bar** to list installed models, pull new ones, or switch between `llama3.1:8b`, `mistral:7b`, `nomic-embed-text`, etc. without restarting the backend.
+
+
 
 ### Prerequisites
 

@@ -18,6 +18,8 @@ import { useWebSocket } from "../hooks/useWebSocket";
 import { useIntelligence } from "../hooks/useIntelligence";
 import { useFinancial } from "../hooks/useFinancial";
 import { useLayers } from "../hooks/useLayers";
+import { loadSettings, usePersistSettings } from "../hooks/useSettings";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 import Dashboard from "../components/Dashboard";
 import AttackFeed from "../components/AttackFeed";
@@ -29,6 +31,10 @@ const IntelligenceBriefPanel = dynamic(() => import("../components/IntelligenceB
 const FinancialTicker = dynamic(() => import("../components/FinancialTicker"), { ssr: false });
 const LayerPanel = dynamic(() => import("../components/LayerPanel"), { ssr: false });
 const CountryRiskPanel = dynamic(() => import("../components/CountryRiskPanel"), { ssr: false });
+const CountryDrilldown = dynamic(() => import("../components/CountryDrilldown"), { ssr: false });
+const OllamaSettings = dynamic(() => import("../components/OllamaSettings"), { ssr: false });
+const NotificationTray = dynamic(() => import("../components/NotificationTray"), { ssr: false });
+const AlertRuleManager = dynamic(() => import("../components/AlertRuleManager"), { ssr: false });
 
 import { ThemeId, THEMES, DEFAULT_THEME, applyTheme } from "../lib/themes";
 import { NewsCategory } from "../types/intelligence";
@@ -37,19 +43,27 @@ type RightPanel = "intel" | "financial" | "risk" | null;
 type LeftPanel = "dashboard" | "layers" | null;
 
 export default function Home() {
-  const { attacks, stats, isConnected, isAnomaly, anomalyScore, sendMessage } =
+  const { attacks, stats, isConnected, isAnomaly, anomalyScore, sendMessage, notifications, clearNotifications } =
     useWebSocket();
+
+  const isMobile = useIsMobile();
+  // Load persisted settings once on mount (safe during SSR via typeof window check)
+  const saved = loadSettings();
+  const persist = usePersistSettings();
 
   const [intelCategory, setIntelCategory] = useState<NewsCategory>("world");
   const intelligence = useIntelligence({ category: intelCategory, autoPoll: true });
   const financial = useFinancial();
   const layers = useLayers();
 
-  const [mapView, setMapView] = useState<"globe" | "flat">("globe");
-  const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME);
-  const [leftPanel, setLeftPanel] = useState<LeftPanel>("dashboard");
-  const [rightPanel, setRightPanel] = useState<RightPanel>(null);
-  const [showFinancial, setShowFinancial] = useState(false);
+  const [mapView, setMapView] = useState<"globe" | "flat">(
+    // Default to flat map on mobile (3D globe is GPU-heavy)
+    typeof window !== "undefined" && window.innerWidth < 768 ? "flat" : saved.mapView
+  );
+  const [theme, setTheme] = useState<ThemeId>(saved.theme);
+  const [leftPanel, setLeftPanel] = useState<LeftPanel>(saved.leftPanel);
+  const [rightPanel, setRightPanel] = useState<RightPanel>(saved.rightPanel);
+  const [showFinancial, setShowFinancial] = useState(saved.showFinancial);
   const [showReplay, setShowReplay] = useState(false);
 
   const [isReplaying, setIsReplaying] = useState(false);
@@ -57,7 +71,12 @@ export default function Home() {
   const [replayTotal, setReplayTotal] = useState(0);
   const [replaySpeed, setReplaySpeed] = useState(1);
 
-  useEffect(() => { applyTheme(theme); }, [theme]);
+  // Country drill-down modal state
+  const [drilldownCountry, setDrilldownCountry] = useState<string | null>(null);
+  const [showAlerts, setShowAlerts] = useState(false);
+  const [showOllamaSettings, setShowOllamaSettings] = useState(false);
+
+  useEffect(() => { applyTheme(theme); persist.saveTheme(theme); }, [theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handlePlay() {
     sendMessage("start_replay", { speed: replaySpeed });
@@ -75,8 +94,20 @@ export default function Home() {
     if (isReplaying) sendMessage("set_replay_speed", { speed });
   }
 
-  const toggleLeft = (panel: LeftPanel) => setLeftPanel((p) => (p === panel ? null : panel));
-  const toggleRight = (panel: RightPanel) => setRightPanel((p) => (p === panel ? null : panel));
+  const toggleLeft = (panel: LeftPanel) => {
+    setLeftPanel((p) => {
+      const next = p === panel ? null : panel;
+      persist.saveLeftPanel(next);
+      return next;
+    });
+  };
+  const toggleRight = (panel: RightPanel) => {
+    setRightPanel((p) => {
+      const next = p === panel ? null : panel;
+      persist.saveRightPanel(next);
+      return next;
+    });
+  };
 
   const currentTheme = THEMES[theme];
 
@@ -87,12 +118,6 @@ export default function Home() {
         <meta name="description" content="Real-time global intelligence — cyber, news, finance, geopolitics" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
-        <link
-          rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
-          integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE=="
-          crossOrigin="anonymous"
-        />
       </Head>
 
       <div className="relative w-screen h-screen overflow-hidden" style={{ background: currentTheme.globe.backgroundColor }}>
@@ -100,7 +125,7 @@ export default function Home() {
         {/* ── Map background ─────────────────────────────── */}
         <div className="absolute inset-0 z-0">
           {mapView === "globe" ? (
-            <Globe attacks={attacks} theme={currentTheme} />
+            <Globe attacks={attacks} theme={currentTheme} onCountryClick={setDrilldownCountry} />
           ) : (
             <FlatMap
               attacks={attacks}
@@ -108,6 +133,7 @@ export default function Home() {
               layerDefinitions={layers.availableLayers}
               layerData={layers.layerData}
               riskScores={intelligence.riskScores}
+              onCountryClick={setDrilldownCountry}
             />
           )}
         </div>
@@ -141,7 +167,7 @@ export default function Home() {
             {/* Map view toggle */}
             <div className="flex border border-white/20 rounded overflow-hidden">
               {(["globe", "flat"] as const).map((v) => (
-                <button key={v} onClick={() => setMapView(v)}
+                <button key={v} onClick={() => { setMapView(v); persist.saveMapView(v); }}
                   className={`px-2 py-1 text-xs transition-colors ${mapView === v ? "bg-white/20 text-white" : "text-gray-500 hover:text-gray-300"}`}>
                   {v === "globe" ? "🌐 3D" : "🗺️ 2D"}
                 </button>
@@ -169,7 +195,7 @@ export default function Home() {
               </button>
             ))}
 
-            <button onClick={() => setShowFinancial((v) => !v)}
+            <button onClick={() => { setShowFinancial((v) => { persist.saveShowFinancial(!v); return !v; }); }}
               className={`px-2 py-1 text-xs border rounded transition-colors ${showFinancial ? "border-[var(--color-accent)] text-[var(--color-accent)]" : "border-white/20 text-gray-400 hover:text-white"}`}>
               📈 MARKETS
             </button>
@@ -183,6 +209,27 @@ export default function Home() {
               className="px-2 py-1 text-xs border border-white/20 text-gray-400 hover:text-white rounded transition-colors">
               ⏮ REPLAY
             </button>
+
+            <button onClick={() => setShowAlerts(true)}
+              className="px-2 py-1 text-xs border border-white/20 text-gray-400 hover:text-white rounded transition-colors"
+              title="Manage alert rules">
+              🚨 ALERTS
+            </button>
+
+            <button
+              onClick={() => setShowOllamaSettings(true)}
+              className={`px-2 py-1 text-xs border rounded transition-colors ${
+                intelligence.ollamaStatus?.available
+                  ? "border-green-800 text-green-500 hover:text-green-300"
+                  : "border-white/20 text-gray-400 hover:text-white"
+              }`}
+              title="Ollama model settings"
+            >
+              🤖 AI
+            </button>
+
+            {/* Notification tray */}
+            <NotificationTray notifications={notifications} onClear={clearNotifications} />
           </div>
         </div>
 
@@ -273,6 +320,29 @@ export default function Home() {
             )}
           </AnimatePresence>
         </div>
+
+        {/* ── Country drill-down modal ─────────────────────── */}
+        {drilldownCountry && (
+          <CountryDrilldown
+            iso2={drilldownCountry}
+            onClose={() => setDrilldownCountry(null)}
+            riskScores={intelligence.riskScores}
+            news={intelligence.news}
+            attacks={attacks}
+            financialSummary={financial.market}
+          />
+        )}
+
+        {/* ── Alert rule manager modal ─────────────────────── */}
+        {showAlerts && <AlertRuleManager onClose={() => setShowAlerts(false)} />}
+
+        {/* ── Ollama model management drawer ───────────────── */}
+        {showOllamaSettings && (
+          <OllamaSettings
+            onClose={() => setShowOllamaSettings(false)}
+            initialStatus={intelligence.ollamaStatus}
+          />
+        )}
       </div>
     </>
   );

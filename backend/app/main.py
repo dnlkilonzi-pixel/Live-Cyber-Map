@@ -35,6 +35,7 @@ from app.services.news_aggregator import news_aggregator
 from app.services.ollama_service import ollama_service
 from app.services.processor import AttackProcessor
 from app.services.websocket_manager import ws_manager
+from app.services.alert_service import alert_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -114,6 +115,18 @@ async def lifespan(app: FastAPI):
     # 7. Background task: feed country risk from attack stream
     risk_task = asyncio.create_task(_risk_feed_loop())
 
+    # 8. Alert service – load rules from DB and start background evaluation
+    try:
+        async with AsyncSessionLocal() as session:
+            from sqlalchemy import select
+            from app.models.alert import AlertRule
+            result = await session.execute(select(AlertRule).where(AlertRule.enabled.is_(True)))
+            rules = list(result.scalars().all())
+            await alert_service.reload_rules(rules)
+        await alert_service.start()
+    except Exception as exc:
+        logger.warning("Alert service startup error (continuing without alerts): %s", exc)
+
     logger.info("Global Intelligence Dashboard backend started.")
     yield
 
@@ -137,6 +150,7 @@ async def lifespan(app: FastAPI):
     await news_aggregator.stop()
     await financial_service.stop()
     await country_risk_service.stop()
+    await alert_service.stop()
     await ws_manager.stop_redis_subscriber()
     await processor.stop()
     await generator.stop()
@@ -181,11 +195,13 @@ def create_app() -> FastAPI:
     from app.api.intelligence_routes import router as intel_router
     from app.api.financial_routes import router as financial_router
     from app.api.layers_routes import router as layers_router
+    from app.api.alert_routes import router as alert_router
 
     app.include_router(api_router, prefix="/api")
     app.include_router(intel_router, prefix="/api/intelligence")
     app.include_router(financial_router, prefix="/api/financial")
     app.include_router(layers_router, prefix="/api/layers")
+    app.include_router(alert_router, prefix="/api/alerts")
 
     # WebSocket handler
     from app.websocket.handler import router as ws_router

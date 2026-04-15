@@ -4,7 +4,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -p 3000"
+    "start": "next start -p 3000",
+    "lint": "next lint",
+    "postinstall": "cp -r node_modules/leaflet/dist/images/*.png public/leaflet/ 2>/dev/null || true"
   },
   "dependencies": {
     "next": "15.2.9",

@@ -42,9 +42,10 @@ interface PointDatum {
 interface GlobeProps {
   attacks: AttackEvent[];
   theme: Theme;
+  onCountryClick?: (iso2: string) => void;
 }
 
-export default function Globe({ attacks, theme }: GlobeProps) {
+export default function Globe({ attacks, theme, onCountryClick }: GlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [arcs, setArcs] = useState<ArcDatum[]>([]);
@@ -129,6 +130,20 @@ export default function Globe({ attacks, theme }: GlobeProps) {
           pointColor={(d) => (d as PointDatum).color}
           pointAltitude={0.01}
           pointRadius={0.3}
+          // Clicking a destination point opens the country drill-down
+          onPointClick={(d) => {
+            const point = d as PointDatum;
+            const attack = attacks.find(
+              (a) =>
+                Math.abs(a.dest_lat - point.lat) < 0.1 &&
+                Math.abs(a.dest_lng - point.lng) < 0.1
+            );
+            if (attack?.dest_country && onCountryClick) {
+              // Map country name to ISO2 via a small lookup
+              const iso2 = COUNTRY_NAME_TO_ISO2[attack.dest_country] ?? attack.dest_country.substring(0, 2).toUpperCase();
+              onCountryClick(iso2);
+            }
+          }}
           // Auto-rotate
           animateIn={true}
         />
@@ -136,3 +151,21 @@ export default function Globe({ attacks, theme }: GlobeProps) {
     </div>
   );
 }
+
+// Country display name → ISO 3166-1 alpha-2 (subset matching GeoIP enrichment)
+const COUNTRY_NAME_TO_ISO2: Record<string, string> = {
+  "United States": "US", "Russia": "RU", "China": "CN", "Germany": "DE",
+  "United Kingdom": "GB", "France": "FR", "Japan": "JP", "India": "IN",
+  "Brazil": "BR", "Canada": "CA", "Australia": "AU", "South Korea": "KR",
+  "Taiwan": "TW", "Ukraine": "UA", "Iran": "IR", "Israel": "IL",
+  "North Korea": "KP", "Saudi Arabia": "SA", "Turkey": "TR", "Egypt": "EG",
+  "Mexico": "MX", "Indonesia": "ID", "Pakistan": "PK", "Nigeria": "NG",
+  "Vietnam": "VN", "Thailand": "TH", "Philippines": "PH", "Netherlands": "NL",
+  "Singapore": "SG", "Sweden": "SE", "Norway": "NO", "Switzerland": "CH",
+  "South Africa": "ZA", "Venezuela": "VE", "Belarus": "BY", "Cuba": "CU",
+  "Syria": "SY", "Iraq": "IQ", "Libya": "LY", "Yemen": "YE",
+  "Afghanistan": "AF", "Sudan": "SD", "Somalia": "SO", "Ethiopia": "ET",
+  "Kenya": "KE", "DR Congo": "CD", "Mali": "ML", "Myanmar": "MM",
+  "Palestine": "PS", "Nicaragua": "NI", "Haiti": "HT",
+  "Central African Rep.": "CF", "South Sudan": "SS",
+};

@@ -30,6 +30,7 @@ class TickerResponse(BaseModel):
     asset_class: str
     exchange: str | None
     last_updated: float
+    is_real: bool = False
 
 
 # ---------------------------------------------------------------------------

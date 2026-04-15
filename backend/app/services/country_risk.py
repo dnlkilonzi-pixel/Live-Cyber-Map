@@ -221,6 +221,11 @@ class CountryRiskService:
             for iso2 in list(self._attack_counts.keys()):
                 self._attack_counts[iso2] = max(0, self._attack_counts[iso2] - 1)
 
+        # Persist snapshots to PostgreSQL (fire-and-forget, every ~5 min)
+        if not hasattr(self, "_last_persist") or time.time() - self._last_persist > 300:
+            self._last_persist = time.time()
+            asyncio.create_task(self._persist_snapshots(list(self._scores.values())))
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
@@ -247,6 +252,25 @@ class CountryRiskService:
             or self._NAME_TO_ISO2.get(key)
             or (name.upper() if len(name) == 2 and name.upper() in _BASELINE else None)
         )
+
+    @staticmethod
+    async def _persist_snapshots(scores: "List[CountryRisk]") -> None:
+        """Persist current risk scores as snapshots (for trend analysis)."""
+        try:
+            from app.core.database import AsyncSessionLocal
+            from app.models.intelligence import CountryRiskSnapshot
+            async with AsyncSessionLocal() as session:
+                for s in scores:
+                    session.add(CountryRiskSnapshot(
+                        iso2=s.iso2,
+                        risk_score=s.risk_score,
+                        cyber_score=s.cyber_score,
+                        news_score=s.news_score,
+                        attack_count_24h=s.attack_count_24h,
+                    ))
+                await session.commit()
+        except Exception as exc:
+            logger.debug("Country risk persistence error: %s", exc)
 
 
 # Module-level singleton

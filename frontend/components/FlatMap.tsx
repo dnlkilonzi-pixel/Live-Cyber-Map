@@ -23,6 +23,7 @@ interface FlatMapProps {
   layerDefinitions: LayerDefinition[];
   layerData: Record<string, LayerData>;
   riskScores: CountryRisk[];
+  onCountryClick?: (iso2: string) => void;
 }
 
 export default function FlatMap({
@@ -31,6 +32,7 @@ export default function FlatMap({
   layerDefinitions,
   layerData,
   riskScores,
+  onCountryClick,
 }: FlatMapProps) {
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -46,10 +48,14 @@ export default function FlatMap({
     const initMap = async () => {
       // Dynamically import leaflet to avoid SSR issues
       const L = (await import("leaflet")).default;
-      // Fix default icon paths (webpack breaks asset resolution for leaflet icons).
-      // Setting imagePath is the documented approach for CDN-hosted images.
-      L.Icon.Default.imagePath =
-        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/";
+      // Fix default marker icon paths broken by webpack asset hashing.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconUrl: "/leaflet/marker-icon.png",
+        iconRetinaUrl: "/leaflet/marker-icon-2x.png",
+        shadowUrl: "/leaflet/marker-shadow.png",
+      });
 
       if (!containerRef.current || mapRef.current) return;
 
@@ -169,7 +175,7 @@ export default function FlatMap({
           for (const risk of riskScores) {
             const r = risk.risk_score / 100;
             const color = riskColor(r);
-            L.circleMarker([risk.lat, risk.lng], {
+            const marker = L.circleMarker([risk.lat, risk.lng], {
               radius: 8 + r * 12,
               color,
               fillColor: color,
@@ -180,8 +186,11 @@ export default function FlatMap({
                 `<b>${risk.name}</b><br/>
                  Risk: ${risk.risk_score.toFixed(0)}/100<br/>
                  Cyber: ${risk.cyber_score.toFixed(0)} | News: ${risk.news_score.toFixed(0)}`
-              )
-              .addTo(group);
+              );
+            if (onCountryClick) {
+              marker.on("click", () => onCountryClick(risk.iso2));
+            }
+            marker.addTo(group);
           }
         } else {
           for (const feature of data.features) {

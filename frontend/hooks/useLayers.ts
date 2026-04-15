@@ -7,6 +7,25 @@ const API_URL =
 // Layers enabled by default on first load
 const DEFAULT_ENABLED: string[] = ["cyber_attacks", "country_risk"];
 
+const STORAGE_KEY = "gid:enabledLayers";
+
+function loadPersistedLayers(): LayerState {
+  if (typeof window === "undefined") {
+    const s: LayerState = {};
+    DEFAULT_ENABLED.forEach((id) => (s[id] = true));
+    return s;
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw) as LayerState;
+  } catch {
+    // ignore
+  }
+  const s: LayerState = {};
+  DEFAULT_ENABLED.forEach((id) => (s[id] = true));
+  return s;
+}
+
 interface UseLayersReturn {
   availableLayers: LayerDefinition[];
   enabledLayers: LayerState;
@@ -21,16 +40,23 @@ interface UseLayersReturn {
 
 export function useLayers(): UseLayersReturn {
   const [availableLayers, setAvailableLayers] = useState<LayerDefinition[]>([]);
-  const [enabledLayers, setEnabledLayersState] = useState<LayerState>(() => {
-    const state: LayerState = {};
-    DEFAULT_ENABLED.forEach((id) => (state[id] = true));
-    return state;
-  });
+  const [enabledLayers, setEnabledLayersState] = useState<LayerState>(() => loadPersistedLayers());
   const [layerData, setLayerData] = useState<Record<string, LayerData>>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const mountedRef = useRef(true);
   const fetchingRef = useRef<Set<string>>(new Set());
+
+  // Persist enabled layers to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(enabledLayers));
+      } catch {
+        // ignore
+      }
+    }
+  }, [enabledLayers]);
 
   // Fetch layer definitions
   useEffect(() => {

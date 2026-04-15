@@ -15,6 +15,7 @@ export interface TickerQuote {
   asset_class: AssetClass;
   exchange: string | null;
   last_updated: number; // Unix timestamp
+  is_real: boolean;     // true = backed by a live API, false = simulated
 }
 
 export interface MarketSummary {

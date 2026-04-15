@@ -73,6 +73,9 @@ async def init_db() -> None:
         async with engine.begin() as conn:
             # Import models so their metadata is registered on Base
             from app.models import attack  # noqa: F401
+            from app.models import alert  # noqa: F401
+            from app.models import intelligence  # noqa: F401
+            from app.models import financial  # noqa: F401
 
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables created / verified.")

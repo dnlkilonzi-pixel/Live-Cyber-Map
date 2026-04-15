@@ -228,6 +228,9 @@ class NewsAggregator:
             except Exception as exc:
                 logger.debug("Redis news cache write failed: %s", exc)
 
+        # Persist new items to PostgreSQL (fire-and-forget)
+        asyncio.create_task(self._persist_news(deduped[:200]))
+
     async def _fetch_feed(
         self, client: httpx.AsyncClient, feed: Dict[str, str]
     ) -> List[NewsItem]:
@@ -376,6 +379,32 @@ class NewsAggregator:
             "tags": item.tags,
             "country_codes": item.country_codes,
         }
+
+    @staticmethod
+    async def _persist_news(items: List[NewsItem]) -> None:
+        """Upsert news items into PostgreSQL (fire-and-forget)."""
+        try:
+            from app.core.database import AsyncSessionLocal
+            from app.models.intelligence import NewsItemDB
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+            async with AsyncSessionLocal() as session:
+                for item in items:
+                    stmt = pg_insert(NewsItemDB).values(
+                        id=item.id,
+                        title=item.title[:1000],
+                        summary=(item.summary or "")[:2000],
+                        url=item.url[:2000],
+                        source=item.source,
+                        category=item.category,
+                        region=item.region,
+                        published_at=item.published_at,
+                        sentiment_score=item.sentiment_score,
+                    ).on_conflict_do_nothing(index_elements=["id"])
+                    await session.execute(stmt)
+                await session.commit()
+        except Exception as exc:
+            logger.debug("News persistence error: %s", exc)
 
 
 # Module-level singleton
