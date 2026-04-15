@@ -33,6 +33,45 @@ services:
     networks:
       - cybermap_net
 
+  # ── Ollama – local AI model server ────────────────────────────────────────
+  # Provides AI-powered intelligence briefs without external API keys.
+  # Pulls llama3.2:3b on first startup (≈2 GB). Can be disabled by commenting out.
+  #
+  # GPU acceleration (optional):
+  #   Uncomment the deploy section below and ensure nvidia-docker is installed.
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - cybermap_net
+    restart: unless-stopped
+    # GPU support – uncomment if you have NVIDIA GPU + nvidia-container-toolkit:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # Pull the default model on startup (runs once, then exits)
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    entrypoint: >
+      /bin/sh -c "
+        sleep 5 &&
+        OLLAMA_HOST=http://ollama:11434 ollama pull ${OLLAMA_MODEL:-llama3.2:3b} &&
+        echo 'Model pulled successfully'
+      "
+    networks:
+      - cybermap_net
+    restart: "no"
+
   backend:
     build:
       context: ./backend
@@ -41,6 +80,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://cybermap:${POSTGRES_PASSWORD:-cybermap_dev}@postgres:5432/cybermap
       REDIS_URL: redis://redis:6379
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
     ports:
       - "8000:8000"
     depends_on:
@@ -85,6 +126,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  ollama_data:
 
 networks:
   cybermap_net:

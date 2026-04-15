@@ -28,7 +28,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, engine, init_db
 from app.services.anomaly_detector import anomaly_detector
+from app.services.country_risk import country_risk_service
+from app.services.financial_data import financial_service
 from app.services.generator import AttackGenerator
+from app.services.news_aggregator import news_aggregator
+from app.services.ollama_service import ollama_service
 from app.services.processor import AttackProcessor
 from app.services.websocket_manager import ws_manager
 
@@ -95,13 +99,34 @@ async def lifespan(app: FastAPI):
     # 5. Background task: feed anomaly detector from processor history
     anomaly_task = asyncio.create_task(_anomaly_feed_loop())
 
-    logger.info("Live Cyber Map backend started.")
+    # 6. Intelligence services (graceful – they degrade if external APIs are down)
+    news_aggregator.set_redis(redis_client)
+    await news_aggregator.start()
+
+    financial_service.set_redis(redis_client)
+    await financial_service.start()
+
+    await country_risk_service.start()
+
+    # Non-blocking Ollama probe (result cached for later requests)
+    asyncio.create_task(ollama_service.is_available())
+
+    # 7. Background task: feed country risk from attack stream
+    risk_task = asyncio.create_task(_risk_feed_loop())
+
+    logger.info("Global Intelligence Dashboard backend started.")
     yield
 
     # ------------------------------------------------------------------ #
     # SHUTDOWN
     # ------------------------------------------------------------------ #
-    logger.info("Shutting down Live Cyber Map backend…")
+    logger.info("Shutting down backend…")
+
+    risk_task.cancel()
+    try:
+        await risk_task
+    except asyncio.CancelledError:
+        pass
 
     anomaly_task.cancel()
     try:
@@ -109,6 +134,9 @@ async def lifespan(app: FastAPI):
     except asyncio.CancelledError:
         pass
 
+    await news_aggregator.stop()
+    await financial_service.stop()
+    await country_risk_service.stop()
     await ws_manager.stop_redis_subscriber()
     await processor.stop()
     await generator.stop()
@@ -127,13 +155,13 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
-        title="Live Cyber Map API",
+        title="Global Intelligence Dashboard API",
         description=(
-            "Real-time global cyber attack visualization platform. "
-            "Streams synthetic attack events over WebSocket and exposes "
-            "REST endpoints for stats and history."
+            "Real-time global intelligence platform. "
+            "Aggregates cyber attacks, news, financial data, and geopolitical "
+            "risk scores. Streams events over WebSocket and exposes REST endpoints."
         ),
-        version="1.0.0",
+        version="2.0.0",
         lifespan=lifespan,
         docs_url="/docs",
         redoc_url="/redoc",
@@ -150,7 +178,14 @@ def create_app() -> FastAPI:
 
     # REST routes
     from app.api.routes import router as api_router
+    from app.api.intelligence_routes import router as intel_router
+    from app.api.financial_routes import router as financial_router
+    from app.api.layers_routes import router as layers_router
+
     app.include_router(api_router, prefix="/api")
+    app.include_router(intel_router, prefix="/api/intelligence")
+    app.include_router(financial_router, prefix="/api/financial")
+    app.include_router(layers_router, prefix="/api/layers")
 
     # WebSocket handler
     from app.websocket.handler import router as ws_router
@@ -191,3 +226,28 @@ async def _anomaly_feed_loop() -> None:
             break
         except Exception as exc:
             logger.debug("Anomaly feed error: %s", exc)
+
+
+async def _risk_feed_loop() -> None:
+    """Feed destination-country attack data into the country risk service."""
+    last_seen_count = 0
+    while True:
+        try:
+            await asyncio.sleep(1.0)
+            if processor is None:
+                continue
+            events = processor.get_recent_events(settings.MAX_EVENTS_HISTORY)
+            new_count = len(events)
+            if new_count > last_seen_count:
+                for event in events[last_seen_count:]:
+                    dest = event.get("dest_country", "")
+                    if dest:
+                        await country_risk_service.record_attack(dest)
+            if new_count < last_seen_count:
+                last_seen_count = 0
+            else:
+                last_seen_count = new_count
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.debug("Risk feed error: %s", exc)

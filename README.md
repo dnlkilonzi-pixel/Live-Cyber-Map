@@ -1,33 +1,28 @@
-# 🌐 Live Cyber Map
+# 🌐 Global Intelligence Dashboard
 
 <div align="center">
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js&logoColor=white)](https://nextjs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)](https://nextjs.org)
+[![Tauri](https://img.shields.io/badge/Tauri-1.6-FFC131?logo=tauri&logoColor=white)](https://tauri.app)
+[![Ollama](https://img.shields.io/badge/Ollama-Local%20AI-white)](https://ollama.ai)
 [![Three.js](https://img.shields.io/badge/Three.js-0.160-black?logo=three.js&logoColor=white)](https://threejs.org)
+[![Leaflet](https://img.shields.io/badge/Leaflet-1.9-199900?logo=leaflet&logoColor=white)](https://leafletjs.com)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docker.com)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?logo=postgresql&logoColor=white)](https://postgresql.org)
 [![License](https://img.shields.io/badge/License-MIT-22c55e)](https://choosealicense.com/licenses/mit/)
 
-**A production-grade real-time global cyber attack visualization platform.**
+**A real-time global intelligence command center.**
 
-Watch live (simulated) cyber attacks animate as glowing arcs across a dark 3D interactive globe. Built for cybersecurity operations centers, powered by a high-throughput event pipeline capable of processing **1,000+ events per second**.
+Aggregates news from 40+ sources, synthesizes AI briefs via a local Ollama model, tracks stocks/crypto/commodities, visualizes 40+ data layers on an interactive globe or flat map, and computes live country risk scores — all without any external API keys.
 
-[Quick Start](#-quick-start) · [Screenshots](#️-screenshots) · [API Reference](#-api-reference) · [Local Development](#-local-development)
+[Quick Start](#-quick-start) · [Architecture](#️-architecture) · [Features](#-features) · [Desktop App](#️-desktop-app-tauri) · [Variants](#-themed-variants) · [API Reference](#-api-reference)
 
 </div>
 
 ---
-
-## 🖥️ Screenshots
-
-> **Note:** Place your screenshots in `docs/screenshots/` — see [`docs/screenshots/README.md`](docs/screenshots/README.md) for filenames and capture instructions.
-
-### Globe Overview
-
-![Live Cyber Map – Globe with attack arcs](docs/screenshots/overview.png)
 
 *The 3D globe displays animated attack arcs from source to destination countries. Arc colors correspond to attack type; arc thickness scales with severity.*
 

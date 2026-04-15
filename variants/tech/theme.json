@@ -1,0 +1,30 @@
+{
+  "id": "tech",
+  "name": "Tech Command",
+  "description": "Technology intelligence dashboard – focused on startup activity, AI research, open-source trends, infrastructure, and tech sector geopolitics.",
+  "icon": "🖥️",
+  "defaultTheme": "tech",
+  "defaultLayers": ["data_centers", "submarine_cables", "satellite_coverage", "5g_coverage", "cyber_attacks"],
+  "defaultCategory": "technology",
+  "appTitle": "Tech Command Center",
+  "primaryColor": "#60a5fa",
+  "secondaryColor": "#a78bfa",
+  "dangerColor": "#f87171",
+  "globe": {
+    "imageUrl": "https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg",
+    "backgroundColor": "#040714",
+    "atmosphereColor": "#1e3a5f"
+  },
+  "features": {
+    "cyberFeed": true,
+    "newsFeed": true,
+    "financialTicker": true,
+    "countryRisk": true,
+    "ollamaEnabled": true,
+    "defaultNewsCategory": "technology"
+  },
+  "branding": {
+    "topBarText": "TECH COMMAND",
+    "subtitle": "Global technology intelligence"
+  }
+}

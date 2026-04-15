@@ -1,6 +1,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { AttackEvent, AttackType } from "../types/attack";
+import { Theme } from "../lib/themes";
 
 const ATTACK_COLORS: Record<AttackType, string> = {
   [AttackType.DDoS]: "#ff4444",
@@ -40,9 +41,10 @@ interface PointDatum {
 
 interface GlobeProps {
   attacks: AttackEvent[];
+  theme: Theme;
 }
 
-export default function Globe({ attacks }: GlobeProps) {
+export default function Globe({ attacks, theme }: GlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [arcs, setArcs] = useState<ArcDatum[]>([]);
@@ -98,15 +100,15 @@ export default function Globe({ attacks }: GlobeProps) {
   return (
     <div
       ref={containerRef}
-      style={{ width: "100vw", height: "100vh", background: "#000011" }}
+      style={{ width: "100vw", height: "100vh", background: theme.globe.backgroundColor }}
     >
       {dimensions.width > 0 && (
         <GlobeGL
           width={dimensions.width}
           height={dimensions.height}
-          globeImageUrl="https://unpkg.com/three-globe/example/img/earth-dark.jpg"
-          backgroundColor="#000011"
-          atmosphereColor="#1a237e"
+          globeImageUrl={theme.globe.imageUrl}
+          backgroundColor={theme.globe.backgroundColor}
+          atmosphereColor={theme.globe.atmosphereColor}
           atmosphereAltitude={0.25}
           // Arcs
           arcsData={arcs}

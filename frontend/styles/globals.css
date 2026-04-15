@@ -2,13 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── CSS Custom Properties (theme vars) ─────────────────── */
+:root {
+  --color-accent: #00ff88;
+  --color-accent-2: #00ffff;
+  --color-accent-3: #ff4444;
+  --color-bg: #000011;
+  --color-panel: rgba(0, 0, 30, 0.85);
+  --color-border: rgba(0, 255, 136, 0.25);
+  --color-text: #e2e8f0;
+  --color-text-muted: #64748b;
+}
+
 /* ── Base ───────────────────────────────────────────────── */
 html,
 body {
   margin: 0;
   padding: 0;
-  background: #000011;
-  color: #e5e7eb;
+  background: var(--color-bg);
+  color: var(--color-text);
   font-family:
     "Inter",
     ui-sans-serif,
@@ -24,29 +36,57 @@ body {
 
 /* ── Glass panel ────────────────────────────────────────── */
 .glass-panel {
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--color-panel);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--color-border);
+}
+
+/* ── Side panel ─────────────────────────────────────────── */
+.side-panel {
+  background: rgba(0, 0, 10, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.side-panel-right {
+  background: rgba(0, 0, 10, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-left: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 /* ── Scrollbar ──────────────────────────────────────────── */
-.dashboard-scroll {
+.dashboard-scroll,
+.scrollbar-thin {
   scrollbar-width: thin;
   scrollbar-color: #1f2937 transparent;
 }
 
-.dashboard-scroll::-webkit-scrollbar {
+.dashboard-scroll::-webkit-scrollbar,
+.scrollbar-thin::-webkit-scrollbar {
   width: 4px;
 }
 
-.dashboard-scroll::-webkit-scrollbar-track {
+.dashboard-scroll::-webkit-scrollbar-track,
+.scrollbar-thin::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.dashboard-scroll::-webkit-scrollbar-thumb {
+.dashboard-scroll::-webkit-scrollbar-thumb,
+.scrollbar-thin::-webkit-scrollbar-thumb {
   background-color: #1f2937;
   border-radius: 2px;
+}
+
+/* Hide scrollbar for tab rows */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 /* ── Animations ─────────────────────────────────────────── */
@@ -103,6 +143,12 @@ body {
     0 0 20px #b91c1c;
 }
 
+.glow-accent {
+  text-shadow:
+    0 0 8px var(--color-accent),
+    0 0 20px var(--color-accent);
+}
+
 /* ── Gradient backgrounds ───────────────────────────────── */
 .bg-space {
   background: radial-gradient(ellipse at center, #000033 0%, #000011 70%);
@@ -111,4 +157,9 @@ body {
 /* ── Smooth transitions ─────────────────────────────────── */
 .transition-all {
   transition: all 0.2s ease;
+}
+
+/* Leaflet dark override */
+.leaflet-container {
+  background: #10121c !important;
 }
