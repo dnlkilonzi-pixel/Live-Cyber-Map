@@ -74,6 +74,83 @@ class OllamaStatusResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.get(
+    "/news/by-country/{iso2}",
+    response_model=List[NewsItemResponse],
+    tags=["intelligence"],
+    summary="Get news items tagged for a specific country ISO2 code",
+)
+async def get_news_by_country(
+    iso2: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return news items whose region column matches the given ISO2 country code.
+
+    Falls back to an in-memory name-match on the news aggregator cache if no
+    DB rows are found (graceful degradation when DB is unavailable).
+    """
+    from app.models.intelligence import NewsItemDB
+
+    iso2_upper = iso2.upper()
+    try:
+        stmt = (
+            select(NewsItemDB)
+            .where(NewsItemDB.region == iso2_upper)
+            .order_by(NewsItemDB.published_at.desc())
+            .limit(limit)
+        )
+        rows = (await db.execute(stmt)).scalars().all()
+        if rows:
+            return [
+                NewsItemResponse(
+                    id=r.id,
+                    title=r.title,
+                    summary=r.summary or "",
+                    url=r.url,
+                    source=r.source,
+                    category=r.category,
+                    region=r.region,
+                    published_at=r.published_at,
+                    sentiment_score=r.sentiment_score,
+                )
+                for r in rows
+            ]
+    except Exception as exc:
+        logger.warning("DB news-by-country query failed for %s: %s", iso2, exc)
+
+    # Fallback: filter in-memory aggregator cache by region or name
+    from app.services.news_aggregator import news_aggregator
+    from app.services.country_risk import country_risk_service
+
+    country_name = ""
+    score = await country_risk_service.get_country_score(iso2_upper)
+    if score:
+        country_name = score.name
+
+    items = await news_aggregator.get_news(limit=200)
+    filtered = [
+        i for i in items
+        if i.region == iso2_upper
+        or (country_name and country_name.lower() in i.title.lower())
+    ][:limit]
+
+    return [
+        NewsItemResponse(
+            id=i.id,
+            title=i.title,
+            summary=i.summary,
+            url=i.url,
+            source=i.source,
+            category=i.category,
+            region=i.region,
+            published_at=i.published_at,
+            sentiment_score=i.sentiment_score,
+        )
+        for i in filtered
+    ]
+
+
+@router.get(
     "/news",
     response_model=List[NewsItemResponse],
     tags=["intelligence"],

@@ -163,6 +163,21 @@ async def stop_replay():
     return {"status": "replay stopped"}
 
 
+@router.post("/replay/seek", tags=["replay"])
+async def seek_replay(
+    position: int = Query(default=0, ge=0, description="Target event index to jump to"),
+):
+    """Seek the replay to a specific event index position.
+
+    The frontend scrubber sends this to jump to any point in history.
+    Broadcasts a ``replay_seek`` message so all clients can sync their
+    UI progress indicator.
+    """
+    _replay_state["position"] = position
+    await ws_manager.broadcast({"type": "replay_seek", "position": position})
+    return {"status": "seek", "position": position}
+
+
 @router.get("/replay/intelligence", tags=["replay"])
 async def get_replay_intelligence(
     from_ts: Optional[float] = Query(

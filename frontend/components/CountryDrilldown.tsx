@@ -63,6 +63,10 @@ export default function CountryDrilldown({
   const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [trendLoading, setTrendLoading] = useState(false);
 
+  // Country-specific news fetched via dedicated endpoint
+  const [countryNews, setCountryNews] = useState<NewsItem[]>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+
   const loadTrend = useCallback(async () => {
     setTrendLoading(true);
     try {
@@ -80,17 +84,36 @@ export default function CountryDrilldown({
     }
   }, [iso2]);
 
+  const loadNews = useCallback(async () => {
+    setNewsLoading(true);
+    try {
+      const resp = await fetch(
+        `${API_URL}/api/intelligence/news/by-country/${iso2}?limit=8`
+      );
+      if (resp.ok) {
+        setCountryNews(await resp.json());
+        return;
+      }
+    } catch {
+      // Fallback to client-side filter below
+    } finally {
+      setNewsLoading(false);
+    }
+    // Fallback: filter from the already-loaded news prop
+    setCountryNews(
+      news
+        .filter((n) =>
+          n.title.toLowerCase().includes(countryName.toLowerCase()) ||
+          (n.summary ?? "").toLowerCase().includes(countryName.toLowerCase())
+        )
+        .slice(0, 8)
+    );
+  }, [iso2, countryName, news]);
+
   useEffect(() => {
     loadTrend();
-  }, [loadTrend]);
-
-  // Filter news mentioning the country name
-  const countryNews = news
-    .filter((n) =>
-      n.title.toLowerCase().includes(countryName.toLowerCase()) ||
-      (n.summary ?? "").toLowerCase().includes(countryName.toLowerCase())
-    )
-    .slice(0, 8);
+    loadNews();
+  }, [loadTrend, loadNews]);
 
   // Relevant financial assets
   const relatedSymbols = COUNTRY_ASSETS[iso2] ?? [];
@@ -279,10 +302,12 @@ export default function CountryDrilldown({
             {/* News */}
             <section>
               <h3 className="text-xs uppercase tracking-widest text-gray-500 mb-3">
-                Recent News — {countryNews.length} items
+                Recent News — {newsLoading ? "…" : `${countryNews.length} items`}
               </h3>
-              {countryNews.length === 0 ? (
-                <p className="text-xs text-gray-600">No recent news matching {countryName}.</p>
+              {newsLoading ? (
+                <p className="text-xs text-gray-600 animate-pulse">Loading news…</p>
+              ) : countryNews.length === 0 ? (
+                <p className="text-xs text-gray-600">No recent news for {countryName}.</p>
               ) : (
                 <div className="space-y-2">
                   {countryNews.map((n) => (

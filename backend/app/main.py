@@ -18,11 +18,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time as _rl_time
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from typing import Optional
 
 import redis.asyncio as aioredis
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
@@ -49,6 +51,14 @@ logger = logging.getLogger(__name__)
 redis_client: Optional[aioredis.Redis] = None
 generator: Optional[AttackGenerator] = None
 processor: Optional[AttackProcessor] = None
+
+# ---------------------------------------------------------------------------
+# Rate-limiter state (module-level so tests can inspect it)
+# ---------------------------------------------------------------------------
+_RATE_LIMIT_PATHS = frozenset({"/api/attacks/recent", "/api/intelligence/risk"})
+_RATE_WINDOW = 60.0
+_RATE_MAX = 60
+_rl_counts: dict = defaultdict(list)  # ip -> list[float] of request timestamps
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +199,27 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Simple in-memory per-IP rate limiter for expensive REST endpoints.
+    # Limit: 60 requests per 60-second window per IP.
+    @app.middleware("http")
+    async def rate_limit_middleware(request: Request, call_next):
+        if request.url.path in _RATE_LIMIT_PATHS:
+            ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or (
+                request.client.host if request.client else "unknown"
+            )
+            now = _rl_time.time()
+            window_start = now - _RATE_WINDOW
+            _rl_counts[ip] = [t for t in _rl_counts[ip] if t > window_start]
+            if len(_rl_counts[ip]) >= _RATE_MAX:
+                return Response(
+                    content='{"detail":"Too many requests"}',
+                    status_code=429,
+                    media_type="application/json",
+                    headers={"Retry-After": str(int(_RATE_WINDOW))},
+                )
+            _rl_counts[ip].append(now)
+        return await call_next(request)
 
     # REST routes
     from app.api.routes import router as api_router

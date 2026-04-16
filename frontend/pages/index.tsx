@@ -76,6 +76,14 @@ export default function Home() {
   const [showAlerts, setShowAlerts] = useState(false);
   const [showOllamaSettings, setShowOllamaSettings] = useState(false);
 
+  // Unread notification count — cleared when alert panel is opened
+  const unreadNotifCount = notifications.filter((n) => !n.read).length;
+
+  // New attacks since feed was last viewed
+  const [lastSeenAttackCount, setLastSeenAttackCount] = useState(0);
+  const newAttackCount = Math.max(0, attacks.length - lastSeenAttackCount);
+  const handleViewFeed = () => setLastSeenAttackCount(attacks.length);
+
   useEffect(() => { applyTheme(theme); persist.saveTheme(theme); }, [theme]); // eslint-disable-line react-hooks/exhaustive-deps -- persist is a stable object from usePersistSettings (useCallback references)
 
   // ── Restore state from URL hash (share links) ─────────────────────────
@@ -147,6 +155,15 @@ export default function Home() {
   function handleSpeedChange(speed: number) {
     setReplaySpeed(speed);
     if (isReplaying) sendMessage("set_replay_speed", { speed });
+  }
+  async function handleSeek(position: number) {
+    setReplayProgress(position);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      await fetch(`${apiUrl}/api/replay/seek?position=${position}`, { method: "POST" });
+    } catch {
+      // Silently ignore — the local progress indicator still updates
+    }
   }
 
   const toggleLeft = (panel: LeftPanel) => {
@@ -266,10 +283,15 @@ export default function Home() {
               ⏮ REPLAY
             </button>
 
-            <button onClick={() => setShowAlerts(true)}
-              className="px-2 py-1 text-xs border border-white/20 text-gray-400 hover:text-white rounded transition-colors"
+            <button onClick={() => { setShowAlerts(true); clearNotifications(); }}
+              className="relative px-2 py-1 text-xs border border-white/20 text-gray-400 hover:text-white rounded transition-colors"
               title="Manage alert rules">
               🚨 ALERTS
+              {unreadNotifCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-bold leading-none">
+                  {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                </span>
+              )}
             </button>
 
             <button
@@ -375,7 +397,14 @@ export default function Home() {
 
         {/* Attack feed (right, when right panel closed, desktop only) */}
         {!rightPanel && !isMobile && (
-          <div className="absolute top-10 right-0 bottom-16 z-10 overflow-hidden">
+          <div className="absolute top-10 right-0 bottom-16 z-10 overflow-hidden" onClick={handleViewFeed}>
+            {newAttackCount > 0 && (
+              <div className="absolute top-0 left-0 right-0 z-10 flex justify-center py-1 pointer-events-none">
+                <span className="px-3 py-0.5 rounded-full bg-red-700/80 text-white text-xs font-bold border border-red-500/50 backdrop-blur-sm">
+                  +{newAttackCount} new {newAttackCount === 1 ? "attack" : "attacks"}
+                </span>
+              </div>
+            )}
             <AttackFeed attacks={attacks} />
           </div>
         )}
@@ -403,10 +432,15 @@ export default function Home() {
               <span>🌡️</span>
               <span className="text-[10px]">Risk</span>
             </button>
-            <button onClick={() => setShowAlerts(true)}
-              className="flex flex-col items-center gap-0.5 text-xs text-gray-400">
+            <button onClick={() => { setShowAlerts(true); clearNotifications(); }}
+              className="relative flex flex-col items-center gap-0.5 text-xs text-gray-400">
               <span>🚨</span>
               <span className="text-[10px]">Alerts</span>
+              {unreadNotifCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-bold leading-none">
+                  {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                </span>
+              )}
             </button>
           </div>
         )}
@@ -430,7 +464,7 @@ export default function Home() {
               <div className="pointer-events-auto">
                 <ReplayControls
                   isReplaying={isReplaying} replayProgress={replayProgress} replayTotal={replayTotal} replaySpeed={replaySpeed}
-                  onPlay={handlePlay} onStop={handleStop} onSpeedChange={handleSpeedChange}
+                  onPlay={handlePlay} onStop={handleStop} onSpeedChange={handleSpeedChange} onSeek={handleSeek}
                 />
               </div>
             )}

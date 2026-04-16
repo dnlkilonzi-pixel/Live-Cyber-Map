@@ -17,6 +17,7 @@ interface AlertRule {
   condition: string;
   target: string | null;
   threshold: number | null;
+  bbox: string | null;
   enabled: boolean;
   created_at: string;
 }
@@ -37,6 +38,11 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
   const [condition, setCondition] = useState("risk_above");
   const [target, setTarget] = useState("");
   const [threshold, setThreshold] = useState("");
+  // Bbox geofence fields (lat_min, lng_min, lat_max, lng_max)
+  const [bboxLatMin, setBboxLatMin] = useState("");
+  const [bboxLngMin, setBboxLngMin] = useState("");
+  const [bboxLatMax, setBboxLatMax] = useState("");
+  const [bboxLngMax, setBboxLngMax] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,12 +62,21 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
 
   const handleCreate = async () => {
     if (!name.trim()) { setError("Name is required"); return; }
+    if (condition === "bbox") {
+      if (!bboxLatMin || !bboxLngMin || !bboxLatMax || !bboxLngMax) {
+        setError("All four bounding-box coordinates are required");
+        return;
+      }
+    }
     setSaving(true);
     setError(null);
     try {
       const body: Record<string, unknown> = { name: name.trim(), condition, enabled: true };
       if (target.trim()) body.target = target.trim();
       if (threshold.trim()) body.threshold = parseFloat(threshold);
+      if (condition === "bbox") {
+        body.bbox = `${bboxLatMin},${bboxLngMin},${bboxLatMax},${bboxLngMax}`;
+      }
 
       const resp = await fetch(`${API_URL}/api/alerts/rules`, {
         method: "POST",
@@ -71,6 +86,7 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       setShowForm(false);
       setName(""); setCondition("risk_above"); setTarget(""); setThreshold("");
+      setBboxLatMin(""); setBboxLngMin(""); setBboxLatMax(""); setBboxLngMax("");
       await fetchRules();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create rule");
@@ -96,7 +112,15 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
     if (c === "risk_above") return "Risk > threshold";
     if (c === "attack_type") return "Attack type detected";
     if (c === "price_change") return "Price change > threshold";
+    if (c === "bbox") return "Geofence (bounding box)";
     return c;
+  };
+
+  const bboxSummary = (rule: AlertRule) => {
+    if (rule.condition !== "bbox" || !rule.bbox) return null;
+    const parts = rule.bbox.split(",");
+    if (parts.length !== 4) return rule.bbox;
+    return `Lat ${parts[0]}–${parts[2]}, Lng ${parts[1]}–${parts[3]}`;
   };
 
   return (
@@ -133,10 +157,11 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-gray-200">{rule.name}</p>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        {conditionLabel(rule.condition)}
-                        {rule.target ? ` · ${rule.target}` : ""}
-                        {rule.threshold != null ? ` > ${rule.threshold}` : ""}
-                      </p>
+                          {conditionLabel(rule.condition)}
+                          {rule.target ? ` · ${rule.target}` : ""}
+                          {rule.threshold != null ? ` > ${rule.threshold}` : ""}
+                          {bboxSummary(rule) ? ` · ${bboxSummary(rule)}` : ""}
+                        </p>
                     </div>
                     <div className="flex gap-2 shrink-0">
                       <button
@@ -187,6 +212,7 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
                       <option value="risk_above">Country risk above threshold</option>
                       <option value="attack_type">Attack type detected</option>
                       <option value="price_change">Asset price change</option>
+                      <option value="bbox">Geofence (bounding box)</option>
                     </select>
 
                     {condition === "attack_type" ? (
@@ -200,6 +226,30 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
                           <option key={t} value={t}>{t}</option>
                         ))}
                       </select>
+                    ) : condition === "bbox" ? (
+                      <div className="space-y-2">
+                        <p className="text-xs text-gray-500">Bounding box coordinates (decimal degrees)</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { label: "Lat min (S bound)", val: bboxLatMin, set: setBboxLatMin, placeholder: "e.g. 35.0" },
+                            { label: "Lng min (W bound)", val: bboxLngMin, set: setBboxLngMin, placeholder: "e.g. -80.0" },
+                            { label: "Lat max (N bound)", val: bboxLatMax, set: setBboxLatMax, placeholder: "e.g. 45.0" },
+                            { label: "Lng max (E bound)", val: bboxLngMax, set: setBboxLngMax, placeholder: "e.g. -70.0" },
+                          ].map(({ label, val, set, placeholder }) => (
+                            <div key={label}>
+                              <p className="text-[10px] text-gray-600 mb-0.5">{label}</p>
+                              <input
+                                type="number"
+                                step="any"
+                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[var(--color-accent)]"
+                                placeholder={placeholder}
+                                value={val}
+                                onChange={(e) => set(e.target.value)}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     ) : (
                       <input
                         className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[var(--color-accent)]"
@@ -209,7 +259,7 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
                       />
                     )}
 
-                    {condition !== "attack_type" && (
+                    {condition !== "attack_type" && condition !== "bbox" && (
                       <input
                         type="number"
                         className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[var(--color-accent)]"

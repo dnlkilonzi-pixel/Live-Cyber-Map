@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +16,15 @@ from app.models.alert import AlertCondition, AlertRule, AlertRuleCreate, AlertRu
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+class AlertRuleUpdate(BaseModel):
+    """Partial update payload for PUT /rules/{id}."""
+    name: Optional[str] = None
+    enabled: Optional[bool] = None
+    threshold: Optional[float] = None
+    target: Optional[str] = None
+    bbox: Optional[str] = None
 
 
 @router.get(
@@ -66,6 +76,33 @@ async def delete_rule(rule_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"Rule {rule_id} not found")
     await db.delete(rule)
     await _sync_alert_service(db)
+
+
+@router.put(
+    "/rules/{rule_id}",
+    response_model=AlertRuleResponse,
+    tags=["alerts"],
+    summary="Update an alert rule in-place (rename, enable/disable, change threshold/bbox)",
+)
+async def update_rule(rule_id: int, body: AlertRuleUpdate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(AlertRule).where(AlertRule.id == rule_id))
+    rule = result.scalar_one_or_none()
+    if rule is None:
+        raise HTTPException(status_code=404, detail=f"Rule {rule_id} not found")
+    if body.name is not None:
+        rule.name = body.name
+    if body.enabled is not None:
+        rule.enabled = body.enabled
+    if body.threshold is not None:
+        rule.threshold = body.threshold
+    if body.target is not None:
+        rule.target = body.target
+    if body.bbox is not None:
+        rule.bbox = body.bbox
+    await db.flush()
+    await db.refresh(rule)
+    await _sync_alert_service(db)
+    return AlertRuleResponse.model_validate(rule)
 
 
 @router.patch(

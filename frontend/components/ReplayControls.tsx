@@ -11,6 +11,7 @@ interface ReplayControlsProps {
   onPlay: () => void;
   onStop: () => void;
   onSpeedChange: (speed: number) => void;
+  onSeek?: (position: number) => void;
 }
 
 interface IntelEvent {
@@ -29,6 +30,7 @@ export default function ReplayControls({
   onPlay,
   onStop,
   onSpeedChange,
+  onSeek,
 }: ReplayControlsProps) {
   const progressPct =
     replayTotal > 0 ? Math.round((replayProgress / replayTotal) * 100) : 0;
@@ -104,7 +106,7 @@ export default function ReplayControls({
           )}
         </button>
 
-        {/* Progress bar */}
+        {/* Progress scrubber */}
         <div className="flex-1">
           <div className="flex justify-between text-[10px] text-gray-500 font-mono mb-1">
             <span>REPLAY</span>
@@ -112,13 +114,25 @@ export default function ReplayControls({
               {replayProgress}/{replayTotal} ({progressPct}%)
             </span>
           </div>
-          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-green-500 rounded-full"
-              animate={{ width: `${progressPct}%` }}
-              transition={{ duration: 0.4 }}
+          {replayTotal > 0 && onSeek ? (
+            <input
+              type="range"
+              min={0}
+              max={replayTotal}
+              value={replayProgress}
+              onChange={(e) => onSeek(parseInt(e.target.value, 10))}
+              className="w-full h-1.5 accent-green-500 cursor-pointer bg-gray-800 rounded-full"
+              aria-label="Replay scrubber"
             />
-          </div>
+          ) : (
+            <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-green-500 rounded-full"
+                animate={{ width: `${progressPct}%` }}
+                transition={{ duration: 0.4 }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Speed selector */}
