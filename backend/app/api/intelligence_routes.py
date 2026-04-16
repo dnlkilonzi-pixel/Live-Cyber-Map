@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -278,8 +283,69 @@ async def ollama_pull(model_name: str):
 )
 async def ollama_select_model(model_name: str):
     """Change the active model used for brief generation."""
-    import os
     from app.services import ollama_service as ollama_module
     ollama_module.OLLAMA_MODEL = model_name
     ollama_module.ollama_service._available = None  # reset probe
     return {"status": "model_changed", "model": model_name}
+
+
+# ---------------------------------------------------------------------------
+# Country risk trend (sparkline data)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/risk/{iso2}/trend",
+    tags=["intelligence"],
+    summary="24-hour risk score trend for a country",
+)
+async def get_country_risk_trend(
+    iso2: str,
+    hours: int = Query(default=24, ge=1, le=168),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Return hourly risk score snapshots for the past *hours* hours.
+
+    Used by the frontend CountryRiskPanel sparkline chart.
+    """
+    import time as _time
+
+    from app.models.intelligence import CountryRiskSnapshot
+
+    t_from = datetime.fromtimestamp(
+        _time.time() - hours * 3600, tz=timezone.utc
+    )
+
+    try:
+        stmt = (
+            select(CountryRiskSnapshot)
+            .where(
+                and_(
+                    CountryRiskSnapshot.iso2 == iso2.upper(),
+                    CountryRiskSnapshot.snapshotted_at >= t_from,
+                )
+            )
+            .order_by(CountryRiskSnapshot.snapshotted_at)
+        )
+        rows = (await db.execute(stmt)).scalars().all()
+
+        points = [
+            {
+                "ts": r.snapshotted_at.timestamp(),
+                "risk_score": round(r.risk_score, 1),
+                "cyber_score": round(r.cyber_score, 1),
+                "news_score": round(r.news_score, 1),
+                "attack_count_24h": r.attack_count_24h,
+            }
+            for r in rows
+        ]
+
+        return {
+            "iso2": iso2.upper(),
+            "hours": hours,
+            "count": len(points),
+            "points": points,
+        }
+
+    except Exception as exc:
+        logger.warning("Risk trend query failed for %s: %s", iso2, exc)
+        raise HTTPException(status_code=503, detail="Database unavailable") from exc

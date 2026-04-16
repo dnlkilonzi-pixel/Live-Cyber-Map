@@ -13,7 +13,6 @@ Results cached with short TTLs to avoid rate limits.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import math
 import random
@@ -223,7 +222,7 @@ class FinancialDataService:
                     self._fetch_stocks_yfinance(),
                     self._fetch_indices_yfinance(),
                     self._fetch_forex_exchangerate(),
-                    self._update_simulated_commodities(),
+                    self._fetch_commodities_yfinance(),
                 )
                 # Persist a sample of real quotes every cycle
                 async with self._lock:
@@ -232,6 +231,7 @@ class FinancialDataService:
                             self._market.indices,
                             self._market.stocks,
                             self._market.forex,
+                            self._market.commodities,
                         ]
                         for q in group if q.is_real
                     ]
@@ -626,7 +626,7 @@ class FinancialDataService:
             now = time.time()
             for q in self._market.commodities:
                 sym = q.symbol.split(" ")[0]  # strip unit suffix
-                key = sym if sym in self._commodity_prices else q.symbol.split("(")[0].strip()
+                _ = sym if sym in self._commodity_prices else q.symbol.split("(")[0].strip()
                 # Find the matching key
                 match_key = next(
                     (k for k in self._commodity_prices if k in q.symbol), None
@@ -639,6 +639,108 @@ class FinancialDataService:
                     q.change = round(new_price * drift, 3)
                     q.change_pct = round(drift * 100, 2)
                     q.last_updated = now
+
+    # yfinance tickers for key commodities (futures)
+    _COMMODITY_YFINANCE: Dict[str, Tuple[str, str, str]] = {
+        # yf_symbol -> (internal_key, display_name, unit)
+        "GC=F":  ("GOLD",       "Gold",              "USD/troy oz"),
+        "SI=F":  ("SILVER",     "Silver",             "USD/troy oz"),
+        "CL=F":  ("CRUDE_OIL",  "Crude Oil (WTI)",    "USD/bbl"),
+        "BZ=F":  ("BRENT",      "Brent Crude",        "USD/bbl"),
+        "NG=F":  ("NATURAL_GAS","Natural Gas",        "USD/MMBtu"),
+        "HG=F":  ("COPPER",     "Copper",             "USD/lb"),
+        "PL=F":  ("PLATINUM",   "Platinum",           "USD/troy oz"),
+        "PA=F":  ("PALLADIUM",  "Palladium",          "USD/troy oz"),
+        "ZW=F":  ("WHEAT",      "Wheat",              "USD/bu"),
+        "ZC=F":  ("CORN",       "Corn",               "USD/bu"),
+        "ZS=F":  ("SOYBEANS",   "Soybeans",           "USD/bu"),
+    }
+
+    async def _fetch_commodities_yfinance(self) -> None:
+        """Fetch real commodity futures prices via yfinance; fall back to simulation."""
+        yf_symbols = list(self._COMMODITY_YFINANCE.keys())
+        quotes = await asyncio.get_event_loop().run_in_executor(
+            None, self._yfinance_fetch_commodities, yf_symbols
+        )
+        if quotes:
+            async with self._lock:
+                # Build a lookup by internal key (e.g. "GOLD")
+                real_map: Dict[str, TickerQuote] = {q.symbol: q for q in quotes}
+                updated: List[TickerQuote] = []
+                for existing in self._market.commodities:
+                    # Find the real quote whose symbol matches the internal key
+                    real = real_map.get(existing.symbol.split(" ")[0])
+                    if real is None:
+                        # Try matching by the internal_key stored in extra metadata
+                        internal_key = next(
+                            (k for k in real_map if k in existing.symbol), None
+                        )
+                        real = real_map.get(internal_key) if internal_key else None
+                    updated.append(real if real else existing)
+                self._market.commodities = updated
+                self._market.last_updated = time.time()
+            logger.debug("yfinance commodities: updated %d quotes", len(quotes))
+        else:
+            await self._update_simulated_commodities()
+
+    def _yfinance_fetch_commodities(self, symbols: List[str]) -> List[TickerQuote]:
+        """Synchronous yfinance download for commodity futures – run in executor."""
+        try:
+            import yfinance as yf  # type: ignore[import]
+            data = yf.download(
+                tickers=symbols,
+                period="2d",
+                interval="1d",
+                group_by="ticker",
+                auto_adjust=True,
+                progress=False,
+                threads=True,
+            )
+            quotes: List[TickerQuote] = []
+            for yf_sym, (internal_key, display_name, unit) in self._COMMODITY_YFINANCE.items():
+                try:
+                    if len(symbols) == 1:
+                        df = data
+                    else:
+                        df = data[yf_sym] if yf_sym in data.columns.get_level_values(0) else None
+                    if df is None or df.empty or len(df) < 1:
+                        continue
+                    row = df.iloc[-1]
+                    price = float(row["Close"])
+                    if math.isnan(price) or price <= 0:
+                        continue
+                    prev_price = price
+                    if len(df) >= 2:
+                        prev = float(df.iloc[-2]["Close"])
+                        if not math.isnan(prev) and prev > 0:
+                            prev_price = prev
+                    change = price - prev_price
+                    change_pct = (change / prev_price * 100) if prev_price > 0 else 0.0
+                    # Update the internal price cache too
+                    self._commodity_prices[internal_key] = price
+                    quotes.append(
+                        TickerQuote(
+                            symbol=internal_key,
+                            name=f"{display_name} ({unit})",
+                            price=round(price, 3),
+                            change=round(change, 3),
+                            change_pct=round(change_pct, 2),
+                            volume=float(row.get("Volume", 0) or 0) or None,
+                            market_cap=None,
+                            high_24h=float(row.get("High", price)),
+                            low_24h=float(row.get("Low", price)),
+                            asset_class="commodity",
+                            exchange="COMEX",
+                            last_updated=time.time(),
+                            is_real=True,
+                        )
+                    )
+                except Exception as sym_exc:
+                    logger.debug("yfinance commodity %s error: %s", yf_sym, sym_exc)
+            return quotes
+        except Exception as exc:
+            logger.debug("yfinance commodity download failed: %s", exc)
+            return []
 
     async def _update_simulated_forex(self) -> None:
         async with self._lock:

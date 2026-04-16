@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, desc
+from sqlalchemy import and_, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -161,3 +161,111 @@ async def stop_replay():
     _replay_state["speed"] = 1.0
     await ws_manager.broadcast({"type": "replay_stopped"})
     return {"status": "replay stopped"}
+
+
+@router.get("/replay/intelligence", tags=["replay"])
+async def get_replay_intelligence(
+    from_ts: Optional[float] = Query(
+        default=None,
+        alias="from",
+        description="Unix timestamp (seconds). Defaults to 24 hours ago.",
+    ),
+    to_ts: Optional[float] = Query(
+        default=None,
+        alias="to",
+        description="Unix timestamp (seconds). Defaults to now.",
+    ),
+    limit: int = Query(default=500, ge=1, le=2000),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Return historical intelligence snapshots for the replay slider.
+
+    Combines:
+    - ``country_risk_snapshots`` – risk score timeline
+    - ``financial_snapshots`` – price timeline (real quotes only)
+
+    Both are bucketed into the requested time window and returned as a merged
+    sorted timeline so the frontend can scrub through them.
+    """
+    import time as _time
+
+    from app.models.financial import FinancialSnapshot
+    from app.models.intelligence import CountryRiskSnapshot
+
+    now = _time.time()
+    t_to = datetime.fromtimestamp(to_ts, tz=timezone.utc) if to_ts else datetime.now(timezone.utc)
+    t_from = (
+        datetime.fromtimestamp(from_ts, tz=timezone.utc)
+        if from_ts
+        else datetime.fromtimestamp(now - 86400, tz=timezone.utc)
+    )
+
+    try:
+        # Risk snapshots
+        risk_stmt = (
+            select(CountryRiskSnapshot)
+            .where(
+                and_(
+                    CountryRiskSnapshot.snapshotted_at >= t_from,
+                    CountryRiskSnapshot.snapshotted_at <= t_to,
+                )
+            )
+            .order_by(CountryRiskSnapshot.snapshotted_at)
+            .limit(limit)
+        )
+        risk_rows = (await db.execute(risk_stmt)).scalars().all()
+
+        # Financial snapshots (real data only to keep payload small)
+        fin_stmt = (
+            select(FinancialSnapshot)
+            .where(
+                and_(
+                    FinancialSnapshot.snapshotted_at >= t_from,
+                    FinancialSnapshot.snapshotted_at <= t_to,
+                    FinancialSnapshot.is_real.is_(True),
+                )
+            )
+            .order_by(FinancialSnapshot.snapshotted_at)
+            .limit(limit)
+        )
+        fin_rows = (await db.execute(fin_stmt)).scalars().all()
+
+        risk_events = [
+            {
+                "type": "risk",
+                "ts": r.snapshotted_at.timestamp(),
+                "iso2": r.iso2,
+                "risk_score": round(r.risk_score, 1),
+                "cyber_score": round(r.cyber_score, 1),
+                "news_score": round(r.news_score, 1),
+                "attack_count_24h": r.attack_count_24h,
+            }
+            for r in risk_rows
+        ]
+
+        fin_events = [
+            {
+                "type": "financial",
+                "ts": f.snapshotted_at.timestamp(),
+                "symbol": f.symbol,
+                "asset_class": f.asset_class,
+                "price": f.price,
+                "change_pct": round(f.change_pct, 2),
+            }
+            for f in fin_rows
+        ]
+
+        # Merge and sort by timestamp
+        merged = sorted(risk_events + fin_events, key=lambda e: e["ts"])
+
+        return {
+            "from": t_from.isoformat(),
+            "to": t_to.isoformat(),
+            "total": len(merged),
+            "events": merged,
+        }
+
+    except Exception as exc:
+        logger.warning("Replay intelligence query failed: %s", exc)
+        raise HTTPException(status_code=503, detail="Database unavailable") from exc
+

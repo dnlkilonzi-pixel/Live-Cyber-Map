@@ -7,7 +7,6 @@ for demonstration; the architecture is designed to swap in live feeds later.
 from __future__ import annotations
 
 import logging
-import math
 import random
 import time
 from typing import Any, Dict, List, Optional
@@ -258,6 +257,18 @@ LAYER_REGISTRY: Dict[str, Dict[str, Any]] = {
         "name": "Live Flight Tracking", "description": "Real-time aircraft positions (OpenSky Network)",
         "icon": "✈️", "color": "#29b6f6", "live": True,
     },
+    # ---- Maritime (real data) ----
+    "vessel_tracking": {
+        "id": "vessel_tracking", "category": "maritime",
+        "name": "Live Vessel Tracking", "description": "AIS vessel positions (AISHub / simulation fallback)",
+        "icon": "🚢", "color": "#0077b6", "live": True,
+    },
+    # ---- Natural Disasters (GDACS real data) ----
+    "gdacs_disasters": {
+        "id": "gdacs_disasters", "category": "disasters",
+        "name": "GDACS Disasters", "description": "Floods, cyclones & volcanoes (GDACS RSS feed)",
+        "icon": "🌊", "color": "#ff6b35", "live": True,
+    },
     # ---- Weather (real data) ----
     "weather": {
         "id": "weather", "category": "environment",
@@ -311,8 +322,8 @@ class LayerDataResponse(BaseModel):
 async def list_layers(category: Optional[str] = Query(default=None)):
     layers = list(LAYER_REGISTRY.values())
     if category:
-        layers = [l for l in layers if l["category"] == category]
-    return [LayerDefinition(**l) for l in layers]
+        layers = [lay for lay in layers if lay["category"] == category]
+    return [LayerDefinition(**lay) for lay in layers]
 
 
 @router.get(
@@ -321,7 +332,7 @@ async def list_layers(category: Optional[str] = Query(default=None)):
     summary="List layer categories",
 )
 async def list_categories():
-    cats = sorted({l["category"] for l in LAYER_REGISTRY.values()})
+    cats = sorted({lay["category"] for lay in LAYER_REGISTRY.values()})
     return {"categories": cats}
 
 
@@ -368,6 +379,8 @@ async def _generate_layer_data(layer_id: str, limit: int) -> List[LayerFeature]:
         "submarine_cables": _submarine_cables_data,
         "flight_tracking": _flight_tracking_data,
         "weather": _weather_data,
+        "gdacs_disasters": _gdacs_disasters_data,
+        "vessel_tracking": _vessel_tracking_data,
     }
 
     gen = generators.get(layer_id)
@@ -767,12 +780,203 @@ async def _weather_data(limit: int) -> List[LayerFeature]:
 
 def _wmo_icon(code: int) -> str:
     """Map WMO weather code to an emoji icon."""
-    if code == 0: return "☀️"
-    if code in (1, 2, 3): return "⛅"
-    if code in (45, 48): return "🌫️"
-    if code in range(51, 68): return "🌧️"
-    if code in range(71, 78): return "❄️"
-    if code in range(80, 83): return "🌦️"
-    if code in (95, 96, 99): return "⛈️"
+    if code == 0:
+        return "☀️"
+    if code in (1, 2, 3):
+        return "⛅"
+    if code in (45, 48):
+        return "🌫️"
+    if code in range(51, 68):
+        return "🌧️"
+    if code in range(71, 78):
+        return "❄️"
+    if code in range(80, 83):
+        return "🌦️"
+    if code in (95, 96, 99):
+        return "⛈️"
     return "🌡️"
+
+
+# ---------------------------------------------------------------------------
+# GDACS natural disaster feed (real data)
+# ---------------------------------------------------------------------------
+
+async def _gdacs_disasters_data(limit: int) -> List[LayerFeature]:
+    """Live disaster events from the GDACS RSS feed (free, no key required).
+
+    GDACS covers floods (FL), cyclones (TC), earthquakes (EQ), volcanoes (VO),
+    droughts (DR), and wildfires (WF).
+    """
+    url = "https://www.gdacs.org/xml/rss.xml"
+    alert_colors = {"Red": 1.0, "Orange": 0.65, "Green": 0.35}
+    event_icons = {
+        "EQ": "🌋", "TC": "🌀", "FL": "🌊", "VO": "🌋",
+        "DR": "🏜️", "WF": "🔥",
+    }
+    try:
+        import xml.etree.ElementTree as ET
+
+        import httpx as _httpx
+
+        async with _httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(
+                url,
+                headers={"User-Agent": "GlobalIntelDashboard/2.0"},
+            )
+            if resp.status_code == 200:
+                root = ET.fromstring(resp.text)
+                ns = {
+                    "gdacs": "http://www.gdacs.org",
+                    "geo": "http://www.w3.org/2003/01/geo/wgs84_pos#",
+                }
+                features: List[LayerFeature] = []
+                channel = root.find("channel")
+                items = channel.findall("item") if channel is not None else root.findall(".//item")
+                for idx, item in enumerate(items[:limit]):
+                    title = (item.findtext("title") or "").strip()
+                    event_type = (
+                        item.findtext("gdacs:eventtype", namespaces=ns) or ""
+                    ).upper()
+                    alert_level = (
+                        item.findtext("gdacs:alertlevel", namespaces=ns) or "Green"
+                    )
+                    lat_text = item.findtext("geo:lat", namespaces=ns)
+                    lng_text = item.findtext("geo:long", namespaces=ns)
+                    if lat_text is None or lng_text is None:
+                        continue
+                    try:
+                        lat = float(lat_text)
+                        lng = float(lng_text)
+                    except ValueError:
+                        continue
+                    icon = event_icons.get(event_type, "⚠️")
+                    value = alert_colors.get(alert_level, 0.3)
+                    features.append(LayerFeature(
+                        id=f"gdacs_{idx}",
+                        lat=round(lat, 4),
+                        lng=round(lng, 4),
+                        value=value,
+                        label=f"{icon} {title}",
+                        extra={
+                            "event_type": event_type,
+                            "alert_level": alert_level,
+                            "is_real": True,
+                        },
+                    ))
+                return features
+    except Exception as exc:
+        logger.debug("GDACS RSS fetch failed: %s", exc)
+
+    # Fallback – simulated disaster events
+    fallback_events = [
+        (13.4, -16.6, "Flood – West Africa", "FL", 0.7),
+        (-8.3, 115.2, "Volcano – Bali", "VO", 0.8),
+        (14.1, 42.6, "Cyclone – Gulf of Aden", "TC", 0.9),
+        (20.5, 121.0, "Typhoon – Philippines", "TC", 0.85),
+        (-1.3, 36.8, "Flood – East Africa", "FL", 0.6),
+        (28.5, 84.1, "Earthquake – Nepal", "EQ", 0.75),
+        (51.5, 10.5, "Wildfire – Central Europe", "WF", 0.4),
+    ]
+    icons_map = {"FL": "🌊", "VO": "🌋", "TC": "🌀", "EQ": "🌋", "WF": "🔥"}
+    return [
+        LayerFeature(
+            id=f"gdacs_sim_{i}",
+            lat=round(lat + random.gauss(0, 0.5), 3),
+            lng=round(lng + random.gauss(0, 0.5), 3),
+            value=val,
+            label=f"{icons_map.get(etype, '⚠️')} {name} (simulated)",
+            extra={"event_type": etype, "alert_level": "Orange", "is_real": False},
+        )
+        for i, (lat, lng, name, etype, val) in enumerate(fallback_events[:limit])
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Maritime AIS vessel tracking (real data with simulation fallback)
+# ---------------------------------------------------------------------------
+
+# Known major shipping lanes / ports for a realistic fallback
+_SHIPPING_LANES = [
+    (1.3, 103.8, "Singapore Strait"),
+    (31.3, 32.3, "Suez Canal"),
+    (29.9, -79.7, "US East Coast"),
+    (35.7, 139.8, "Tokyo Bay"),
+    (22.3, 114.2, "Hong Kong"),
+    (51.9, 4.5, "Rotterdam"),
+    (-33.9, 18.4, "Cape of Good Hope"),
+    (37.9, -122.4, "San Francisco Bay"),
+    (53.5, -0.1, "Humber Estuary"),
+    (55.6, 12.6, "Øresund Strait"),
+    (4.0, -51.5, "Atlantic Crossing"),
+    (-23.0, -43.2, "Rio de Janeiro"),
+    (30.1, 31.3, "Alexandria"),
+    (25.2, 55.3, "Dubai/Jebel Ali"),
+]
+
+async def _vessel_tracking_data(limit: int) -> List[LayerFeature]:
+    """Live AIS vessel positions.
+
+    Attempts to use AISHub aggregate feed (free, public).
+    Falls back to simulated shipping lane traffic if unavailable.
+    """
+    url = "https://www.aishub.net/api/2/data?format=2&output=json&compress=0"
+    try:
+        import httpx as _httpx
+        async with _httpx.AsyncClient(timeout=12.0) as client:
+            resp = await client.get(
+                url,
+                headers={"User-Agent": "GlobalIntelDashboard/2.0"},
+            )
+            if resp.status_code == 200:
+                payload = resp.json()
+                # AISHub returns a list of vessel dicts or {"ERROR": ...}
+                vessels = payload if isinstance(payload, list) else payload.get("vessels", [])
+                if not vessels:
+                    raise ValueError("empty AIS response")
+                features: List[LayerFeature] = []
+                for vessel in vessels[:limit]:
+                    lat = vessel.get("LATITUDE") or vessel.get("lat")
+                    lng = vessel.get("LONGITUDE") or vessel.get("lon")
+                    if lat is None or lng is None:
+                        continue
+                    name = (
+                        vessel.get("NAME")
+                        or vessel.get("name")
+                        or vessel.get("MMSI", "")
+                    )
+                    sog = float(vessel.get("SOG") or vessel.get("speed") or 0)
+                    features.append(LayerFeature(
+                        id=str(vessel.get("MMSI", f"v_{len(features)}")),
+                        lat=round(float(lat), 4),
+                        lng=round(float(lng), 4),
+                        value=min(1.0, sog / 25),
+                        label=f"🚢 {name}",
+                        extra={
+                            "speed_kn": round(sog, 1),
+                            "is_real": True,
+                        },
+                    ))
+                if features:
+                    return features
+    except Exception as exc:
+        logger.debug("AISHub fetch failed: %s", exc)
+
+    # Simulated vessel traffic along major shipping lanes
+    vessels = []
+    rng = random.Random(int(time.time() / 300))  # change every 5 min
+    for i in range(min(limit, 80)):
+        lane = _SHIPPING_LANES[i % len(_SHIPPING_LANES)]
+        lat = lane[0] + rng.gauss(0, 1.5)
+        lng = lane[1] + rng.gauss(0, 2.0)
+        speed = rng.uniform(5, 22)
+        vessel_types = ["Tanker", "Container", "Bulk Carrier", "LNG", "RORO"]
+        vessels.append(LayerFeature(
+            id=f"vessel_sim_{i}",
+            lat=round(lat, 3),
+            lng=round(lng, 3),
+            value=round(speed / 25, 2),
+            label=f"🚢 {vessel_types[i % len(vessel_types)]} near {lane[2]}",
+            extra={"speed_kn": round(speed, 1), "is_real": False},
+        ))
+    return vessels
 

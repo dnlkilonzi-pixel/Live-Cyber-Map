@@ -65,7 +65,12 @@
       "csp": "default-src 'self'; img-src 'self' data: https: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:8000 ws://localhost:8000 http://localhost:11434 https://api.coingecko.com https://*.basemaps.cartocdn.com https://unpkg.com"
     },
     "updater": {
-      "active": false
+      "active": true,
+      "endpoints": [
+        "https://github.com/DANIELKILONZI/Live-Cyber-Map/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": ""
     },
     "windows": [
       {
