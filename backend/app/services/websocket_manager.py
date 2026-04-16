@@ -97,7 +97,27 @@ class WebSocketManager:
         client_ip = self._get_ip(websocket)
         if self._ip_counts[client_ip] > 0:
             self._ip_counts[client_ip] -= 1
+        # Prune stale rate-limit state once no active connections remain
+        if self._ip_counts[client_ip] == 0:
+            self._prune_stale_ip_state(client_ip)
         logger.info("WS disconnected — total: %d", len(self._active))
+
+    def _prune_stale_ip_state(self, ip: str) -> None:
+        """Remove rate-limit history for *ip* if all timestamps are outside the window.
+
+        Called after the last connection from an IP is closed so that the
+        ``_ip_connect_times`` and ``_ip_counts`` dicts don't grow unboundedly.
+        """
+        now = time.time()
+        window_start = now - _WS_RATE_WINDOW
+        recent = [t for t in self._ip_connect_times.get(ip, []) if t > window_start]
+        if recent:
+            # Keep only the trimmed list; IP may reconnect soon
+            self._ip_connect_times[ip] = recent
+        else:
+            # No activity in the window → evict entirely
+            self._ip_connect_times.pop(ip, None)
+            self._ip_counts.pop(ip, None)
 
     # ------------------------------------------------------------------
     # Broadcasting

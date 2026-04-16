@@ -37,7 +37,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           pytest tests/ -v --tb=short --ignore=tests/integration \
-            --cov=app --cov-report=term-missing --cov-fail-under=30
+            --cov=app --cov-report=term-missing --cov-fail-under=50
         env:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
           REDIS_URL: "redis://localhost:6379"

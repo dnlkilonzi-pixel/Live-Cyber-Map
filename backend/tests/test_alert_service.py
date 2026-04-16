@@ -269,3 +269,140 @@ class TestCheckCountryRisk:
         await svc.reload_rules([rule])
         fired = await svc.check_country_risk("CN", 99.0)
         assert len(fired) == 0
+
+
+# ---------------------------------------------------------------------------
+# AlertService.check_attack (ATTACK_TYPE condition, by type filter)
+# ---------------------------------------------------------------------------
+
+class TestCheckAttack:
+    """Tests for AlertService.check_attack — standalone method."""
+
+    @pytest.mark.anyio
+    async def test_fires_for_matching_target(self):
+        svc = AlertService()
+        rule = _make_rule(1, condition="attack_type", target="DDoS")
+        await svc.reload_rules([rule])
+        fired = await svc.check_attack("DDoS", "US")
+        assert len(fired) == 1
+        assert "DDoS" in fired[0].message
+
+    @pytest.mark.anyio
+    async def test_does_not_fire_for_wrong_type(self):
+        svc = AlertService()
+        rule = _make_rule(1, condition="attack_type", target="Ransomware")
+        await svc.reload_rules([rule])
+        fired = await svc.check_attack("DDoS", "US")
+        assert len(fired) == 0
+
+    @pytest.mark.anyio
+    async def test_fires_for_any_type_when_no_target(self):
+        svc = AlertService()
+        rule = _make_rule(1, condition="attack_type", target=None)
+        await svc.reload_rules([rule])
+        fired = await svc.check_attack("Malware", "DE")
+        assert len(fired) == 1
+
+    @pytest.mark.anyio
+    async def test_disabled_rule_does_not_fire(self):
+        svc = AlertService()
+        rule = _make_rule(1, condition="attack_type", target=None, enabled=False)
+        await svc.reload_rules([rule])
+        fired = await svc.check_attack("DDoS", "US")
+        assert len(fired) == 0
+
+    @pytest.mark.anyio
+    async def test_wrong_condition_does_not_fire(self):
+        svc = AlertService()
+        rule = _make_rule(1, condition="risk_above", target="DDoS")
+        await svc.reload_rules([rule])
+        fired = await svc.check_attack("DDoS", "US")
+        assert len(fired) == 0
+
+
+# ---------------------------------------------------------------------------
+# AlertService.check_price_change
+# ---------------------------------------------------------------------------
+
+class TestCheckPriceChange:
+    """Tests for AlertService.check_price_change."""
+
+    @pytest.mark.anyio
+    async def test_fires_when_change_exceeds_threshold(self):
+        svc = AlertService()
+        rule = _make_rule(1, condition="price_change", threshold=5.0, target="BTC")
+        await svc.reload_rules([rule])
+        fired = await svc.check_price_change("BTC", 7.5)
+        assert len(fired) == 1
+        assert "BTC" in fired[0].message
+
+    @pytest.mark.anyio
+    async def test_fires_on_negative_change(self):
+        svc = AlertService()
+        rule = _make_rule(1, condition="price_change", threshold=5.0, target="ETH")
+        await svc.reload_rules([rule])
+        fired = await svc.check_price_change("ETH", -8.0)
+        assert len(fired) == 1
+        assert "down" in fired[0].message
+
+    @pytest.mark.anyio
+    async def test_does_not_fire_below_threshold(self):
+        svc = AlertService()
+        rule = _make_rule(1, condition="price_change", threshold=5.0, target="BTC")
+        await svc.reload_rules([rule])
+        fired = await svc.check_price_change("BTC", 2.0)
+        assert len(fired) == 0
+
+    @pytest.mark.anyio
+    async def test_does_not_fire_wrong_symbol(self):
+        svc = AlertService()
+        rule = _make_rule(1, condition="price_change", threshold=5.0, target="BTC")
+        await svc.reload_rules([rule])
+        fired = await svc.check_price_change("ETH", 99.0)
+        assert len(fired) == 0
+
+    @pytest.mark.anyio
+    async def test_no_threshold_does_not_fire(self):
+        svc = AlertService()
+        rule = _make_rule(1, condition="price_change", threshold=None, target="BTC")
+        await svc.reload_rules([rule])
+        fired = await svc.check_price_change("BTC", 99.0)
+        assert len(fired) == 0
+
+    @pytest.mark.anyio
+    async def test_message_includes_direction_up(self):
+        svc = AlertService()
+        rule = _make_rule(1, condition="price_change", threshold=1.0, target="BTC")
+        await svc.reload_rules([rule])
+        fired = await svc.check_price_change("BTC", 3.5)
+        assert "up" in fired[0].message
+
+
+# ---------------------------------------------------------------------------
+# AlertService lifecycle: start / stop
+# ---------------------------------------------------------------------------
+
+class TestAlertServiceLifecycle:
+    """Tests for start() and stop() task management."""
+
+    @pytest.mark.anyio
+    async def test_start_creates_background_task(self):
+        svc = AlertService()
+        await svc.start()
+        try:
+            assert svc._check_task is not None
+            assert not svc._check_task.done()
+        finally:
+            await svc.stop()
+
+    @pytest.mark.anyio
+    async def test_stop_cancels_task(self):
+        svc = AlertService()
+        await svc.start()
+        await svc.stop()
+        assert svc._check_task.done()
+
+    @pytest.mark.anyio
+    async def test_stop_without_start_does_not_raise(self):
+        svc = AlertService()
+        await svc.stop()  # must not raise

@@ -14,20 +14,17 @@ Scope:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.models.alert import AlertFired, AlertRule
 from app.services.alert_service import alert_service
 from app.services.websocket_manager import ws_manager
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -212,8 +209,9 @@ async def test_health_endpoint():
 @pytest.mark.asyncio
 async def test_rate_limit_returns_429():
     """After 60 requests in the window, the 61st must get a 429 response."""
-    from app.main import _rl_counts, _RATE_LIMIT_PATHS
     import time as _time
+
+    from app.main import _RATE_LIMIT_PATHS, _rl_counts
 
     # Pick one of the rate-limited paths
     path = "/api/attacks/recent"
