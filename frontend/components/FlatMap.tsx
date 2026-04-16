@@ -24,6 +24,7 @@ interface FlatMapProps {
   layerData: Record<string, LayerData>;
   riskScores: CountryRisk[];
   onCountryClick?: (iso2: string) => void;
+  onMapClick?: (lat: number, lng: number) => void;
 }
 
 // Available tile layers (all free, no API key required)
@@ -60,6 +61,7 @@ export default function FlatMap({
   layerData,
   riskScores,
   onCountryClick,
+  onMapClick,
 }: FlatMapProps) {
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,6 +71,8 @@ export default function FlatMap({
   >({});
   const tileLayerRef = useRef<import("leaflet").TileLayer | null>(null);
   const [activeTile, setActiveTile] = useState<TileLayerId>("dark");
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
 
   // Initialise Leaflet map
   useEffect(() => {
@@ -106,6 +110,13 @@ export default function FlatMap({
 
       attackLayerRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
+
+      // Forward map clicks to the onMapClick prop (used for bbox capture)
+      map.on("click", (e) => {
+        if (onMapClickRef.current) {
+          onMapClickRef.current(e.latlng.lat, e.latlng.lng);
+        }
+      });
     };
 
     initMap();

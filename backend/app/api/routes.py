@@ -166,15 +166,53 @@ async def stop_replay():
 @router.post("/replay/seek", tags=["replay"])
 async def seek_replay(
     position: int = Query(default=0, ge=0, description="Target event index to jump to"),
+    db: AsyncSession = Depends(get_db),
 ):
     """Seek the replay to a specific event index position.
 
     The frontend scrubber sends this to jump to any point in history.
     Broadcasts a ``replay_seek`` message so all clients can sync their
-    UI progress indicator.
+    UI progress indicator.  Also re-broadcasts up to 50 historical
+    ``AttackEvent`` rows starting from *position* so clients see the
+    correct attack map state after a seek.
     """
+    from app.models.attack import AttackEvent as AttackEventModel
+
     _replay_state["position"] = position
     await ws_manager.broadcast({"type": "replay_seek", "position": position})
+
+    # Re-broadcast historical events from the requested position forward
+    try:
+        stmt = (
+            select(AttackEventModel)
+            .order_by(AttackEventModel.id)
+            .offset(position)
+            .limit(50)
+        )
+        rows = (await db.execute(stmt)).scalars().all()
+        for row in rows:
+            payload = {
+                "type": "attack",
+                "data": {
+                    "id": str(row.id),
+                    "source_ip": row.source_ip,
+                    "source_country": row.source_country,
+                    "source_lat": row.source_lat,
+                    "source_lng": row.source_lng,
+                    "dest_ip": row.dest_ip,
+                    "dest_country": row.dest_country,
+                    "dest_lat": row.dest_lat,
+                    "dest_lng": row.dest_lng,
+                    "attack_type": row.attack_type,
+                    "severity": row.severity,
+                    "cluster_id": row.cluster_id,
+                    "timestamp": row.timestamp.isoformat(),
+                },
+            }
+            await ws_manager.broadcast(payload)
+    except Exception as exc:
+        logger.warning("Seek replay event broadcast failed: %s", exc)
+
     return {"status": "seek", "position": position}
 
 

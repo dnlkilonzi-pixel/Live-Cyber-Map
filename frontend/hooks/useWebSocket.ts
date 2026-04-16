@@ -16,9 +16,11 @@ interface UseWebSocketReturn {
   isAnomaly: boolean;
   anomalyScore: number;
   notifications: AlertNotification[];
+  replaySyncPosition: number | null;
   sendMessage: (type: string, data?: unknown) => void;
   clearHistory: () => void;
   clearNotifications: () => void;
+  markAllRead: () => void;
 }
 
 export function useWebSocket(): UseWebSocketReturn {
@@ -28,6 +30,7 @@ export function useWebSocket(): UseWebSocketReturn {
   const [isAnomaly, setIsAnomaly] = useState(false);
   const [anomalyScore, setAnomalyScore] = useState(0);
   const [notifications, setNotifications] = useState<AlertNotification[]>([]);
+  const [replaySyncPosition, setReplaySyncPosition] = useState<number | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
@@ -40,6 +43,10 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const clearNotifications = useCallback(() => {
     setNotifications([]);
+  }, []);
+
+  const markAllRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }, []);
 
   const sendMessage = useCallback((type: string, data: unknown = {}) => {
@@ -97,6 +104,10 @@ export function useWebSocket(): UseWebSocketReturn {
 
             case "replay_started":
             case "replay_stopped":
+              break;
+
+            case "replay_seek":
+              setReplaySyncPosition(msg.position);
               break;
 
             case "alert": {
@@ -191,8 +202,10 @@ export function useWebSocket(): UseWebSocketReturn {
     isAnomaly,
     anomalyScore,
     notifications,
+    replaySyncPosition,
     sendMessage,
     clearHistory,
     clearNotifications,
+    markAllRead,
   };
 }

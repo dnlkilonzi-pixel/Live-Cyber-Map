@@ -44,4 +44,5 @@ export type WebSocketMessage =
   | { type: "history"; data: AttackEvent[] }
   | { type: "replay_started"; data: { total: number } }
   | { type: "replay_stopped"; data: Record<string, never> }
+  | { type: "replay_seek"; position: number }
   | { type: "alert"; data: { rule_id: number; rule_name: string; message: string; fired_at: number } };

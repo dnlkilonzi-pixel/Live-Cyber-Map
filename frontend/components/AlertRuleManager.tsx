@@ -24,14 +24,19 @@ interface AlertRule {
 
 interface AlertRuleManagerProps {
   onClose: () => void;
+  onBboxCapture?: (cb: (lat: number, lng: number) => void) => void;
 }
 
 const ATTACK_TYPES = ["DDoS", "Malware", "Phishing", "Ransomware", "Intrusion", "BruteForce", "SQLInjection", "XSS", "ZeroDay"];
 
-export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
+export default function AlertRuleManager({ onClose, onBboxCapture }: AlertRuleManagerProps) {
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+
+  // Inline-edit state
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
 
   // Form state
   const [name, setName] = useState("");
@@ -43,6 +48,7 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
   const [bboxLngMin, setBboxLngMin] = useState("");
   const [bboxLatMax, setBboxLatMax] = useState("");
   const [bboxLngMax, setBboxLngMax] = useState("");
+  const [bboxPickingPoint, setBboxPickingPoint] = useState<1 | 2 | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,6 +114,94 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
     }
   };
 
+  const startEdit = (rule: AlertRule) => {
+    setEditingId(rule.id);
+    setEditingName(rule.name);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingName("");
+  };
+
+  const saveEdit = async (id: number) => {
+    const trimmed = editingName.trim();
+    if (!trimmed) return;
+    try {
+      const resp = await fetch(`${API_URL}/api/alerts/rules/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (resp.ok) {
+        const updated: AlertRule = await resp.json();
+        setRules((prev) => prev.map((r) => r.id === id ? updated : r));
+      }
+    } catch {
+      // Silently fail — name will revert on next fetch
+    }
+    setEditingId(null);
+    setEditingName("");
+  };
+
+  const handleExport = () => {
+    const blob = new Blob([JSON.stringify(rules, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `alert-rules-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const imported: AlertRule[] = JSON.parse(ev.target?.result as string);
+        for (const rule of imported) {
+          await fetch(`${API_URL}/api/alerts/rules`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: rule.name,
+              condition: rule.condition,
+              target: rule.target ?? undefined,
+              threshold: rule.threshold ?? undefined,
+              bbox: rule.bbox ?? undefined,
+              enabled: rule.enabled,
+            }),
+          });
+        }
+        await fetchRules();
+      } catch {
+        // Silently ignore malformed files
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so the same file can be re-imported
+    e.target.value = "";
+  };
+
+  const pickBboxPoint = (point: 1 | 2) => {
+    if (!onBboxCapture) return;
+    setBboxPickingPoint(point);
+    onBboxCapture((lat, lng) => {
+      const latStr = lat.toFixed(4);
+      const lngStr = lng.toFixed(4);
+      if (point === 1) {
+        setBboxLatMin(latStr);
+        setBboxLngMin(lngStr);
+      } else {
+        setBboxLatMax(latStr);
+        setBboxLngMax(lngStr);
+      }
+      setBboxPickingPoint(null);
+    });
+  };
+
   const conditionLabel = (c: string) => {
     if (c === "risk_above") return "Risk > threshold";
     if (c === "attack_type") return "Attack type detected";
@@ -141,7 +235,22 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
             <span className="font-bold text-sm uppercase tracking-widest text-[var(--color-accent)]">Alert Rules</span>
-            <button onClick={onClose} className="text-gray-400 hover:text-white text-xl px-1">×</button>
+            <div className="flex items-center gap-2">
+              {rules.length > 0 && (
+                <button
+                  onClick={handleExport}
+                  className="text-xs text-gray-400 hover:text-white border border-white/10 rounded px-2 py-0.5 transition-colors"
+                  title="Export rules as JSON"
+                >
+                  ↓ Export
+                </button>
+              )}
+              <label className="text-xs text-gray-400 hover:text-white border border-white/10 rounded px-2 py-0.5 transition-colors cursor-pointer" title="Import rules from JSON">
+                ↑ Import
+                <input type="file" accept=".json,application/json" className="hidden" onChange={handleImport} />
+              </label>
+              <button onClick={onClose} className="text-gray-400 hover:text-white text-xl px-1">×</button>
+            </div>
           </div>
 
           <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto scrollbar-thin">
@@ -154,8 +263,22 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
               <div className="space-y-2">
                 {rules.map((rule) => (
                   <div key={rule.id} className={`flex items-start justify-between gap-3 px-3 py-2.5 rounded bg-white/5 ${rule.enabled ? "" : "opacity-50"}`}>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-gray-200">{rule.name}</p>
+                    <div className="min-w-0 flex-1">
+                      {editingId === rule.id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            className="flex-1 bg-white/10 border border-[var(--color-accent)] rounded px-2 py-0.5 text-xs text-white focus:outline-none"
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") saveEdit(rule.id); if (e.key === "Escape") cancelEdit(); }}
+                            autoFocus
+                          />
+                          <button onClick={() => saveEdit(rule.id)} className="text-xs text-green-400 hover:text-green-300 px-1">✓</button>
+                          <button onClick={cancelEdit} className="text-xs text-gray-500 hover:text-white px-1">✕</button>
+                        </div>
+                      ) : (
+                        <p className="text-xs font-semibold text-gray-200">{rule.name}</p>
+                      )}
                       <p className="text-xs text-gray-500 mt-0.5">
                           {conditionLabel(rule.condition)}
                           {rule.target ? ` · ${rule.target}` : ""}
@@ -164,6 +287,16 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
                         </p>
                     </div>
                     <div className="flex gap-2 shrink-0">
+                      {editingId !== rule.id && (
+                        <button
+                          onClick={() => startEdit(rule)}
+                          className="text-xs text-gray-500 hover:text-white px-1 transition-colors"
+                          aria-label="Rename rule"
+                          title="Rename"
+                        >
+                          ✏
+                        </button>
+                      )}
                       <button
                         onClick={() => handleToggle(rule.id)}
                         className={`text-xs px-2 py-0.5 rounded border transition-colors ${rule.enabled ? "border-green-600 text-green-400 hover:bg-green-900/30" : "border-gray-600 text-gray-500 hover:text-white"}`}
@@ -229,6 +362,24 @@ export default function AlertRuleManager({ onClose }: AlertRuleManagerProps) {
                     ) : condition === "bbox" ? (
                       <div className="space-y-2">
                         <p className="text-xs text-gray-500">Bounding box coordinates (decimal degrees)</p>
+                        {onBboxCapture && (
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => pickBboxPoint(1)}
+                              className={`flex-1 text-xs py-1 rounded border transition-colors ${bboxPickingPoint === 1 ? "border-[var(--color-accent)] text-[var(--color-accent)] animate-pulse" : "border-white/20 text-gray-500 hover:text-white"}`}
+                            >
+                              {bboxPickingPoint === 1 ? "Click map for SW…" : "📍 Pick SW corner"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => pickBboxPoint(2)}
+                              className={`flex-1 text-xs py-1 rounded border transition-colors ${bboxPickingPoint === 2 ? "border-[var(--color-accent)] text-[var(--color-accent)] animate-pulse" : "border-white/20 text-gray-500 hover:text-white"}`}
+                            >
+                              {bboxPickingPoint === 2 ? "Click map for NE…" : "📍 Pick NE corner"}
+                            </button>
+                          </div>
+                        )}
                         <div className="grid grid-cols-2 gap-2">
                           {[
                             { label: "Lat min (S bound)", val: bboxLatMin, set: setBboxLatMin, placeholder: "e.g. 35.0" },

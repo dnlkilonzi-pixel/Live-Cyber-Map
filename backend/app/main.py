@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time as _rl_time
+import uuid
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -199,6 +200,25 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Structured logging middleware: injects X-Request-ID and logs every
+    # request with method, path, status code, and wall-clock latency.
+    @app.middleware("http")
+    async def request_id_middleware(request: Request, call_next):
+        req_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+        start = _rl_time.perf_counter()
+        response = await call_next(request)
+        elapsed_ms = ((_rl_time.perf_counter() - start) * 1000)
+        response.headers["x-request-id"] = req_id
+        logger.info(
+            "%s %s %s %.1fms req_id=%s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            elapsed_ms,
+            req_id,
+        )
+        return response
 
     # Simple in-memory per-IP rate limiter for expensive REST endpoints.
     # Limit: 60 requests per 60-second window per IP.

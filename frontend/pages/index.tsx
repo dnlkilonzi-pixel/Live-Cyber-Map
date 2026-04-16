@@ -43,7 +43,7 @@ type RightPanel = "intel" | "financial" | "risk" | null;
 type LeftPanel = "dashboard" | "layers" | null;
 
 export default function Home() {
-  const { attacks, stats, isConnected, isAnomaly, anomalyScore, sendMessage, notifications, clearNotifications } =
+  const { attacks, stats, isConnected, isAnomaly, anomalyScore, sendMessage, notifications, clearNotifications, markAllRead, replaySyncPosition } =
     useWebSocket();
 
   const isMobile = useIsMobile();
@@ -75,6 +75,7 @@ export default function Home() {
   const [drilldownCountry, setDrilldownCountry] = useState<string | null>(null);
   const [showAlerts, setShowAlerts] = useState(false);
   const [showOllamaSettings, setShowOllamaSettings] = useState(false);
+  const [bboxCaptureCallback, setBboxCaptureCallback] = useState<((lat: number, lng: number) => void) | null>(null);
 
   // Unread notification count — cleared when alert panel is opened
   const unreadNotifCount = notifications.filter((n) => !n.read).length;
@@ -166,6 +167,13 @@ export default function Home() {
     }
   }
 
+  // Sync replay position broadcast from other clients via WebSocket
+  useEffect(() => {
+    if (replaySyncPosition !== null) {
+      setReplayProgress(replaySyncPosition);
+    }
+  }, [replaySyncPosition]);
+
   const toggleLeft = (panel: LeftPanel) => {
     setLeftPanel((p) => {
       const next = p === panel ? null : panel;
@@ -206,6 +214,10 @@ export default function Home() {
               layerData={layers.layerData}
               riskScores={intelligence.riskScores}
               onCountryClick={setDrilldownCountry}
+              onMapClick={bboxCaptureCallback ? (lat, lng) => {
+                bboxCaptureCallback(lat, lng);
+                setBboxCaptureCallback(null);
+              } : undefined}
             />
           )}
         </div>
@@ -283,7 +295,7 @@ export default function Home() {
               ⏮ REPLAY
             </button>
 
-            <button onClick={() => { setShowAlerts(true); clearNotifications(); }}
+            <button onClick={() => { setShowAlerts(true); markAllRead(); }}
               className="relative px-2 py-1 text-xs border border-white/20 text-gray-400 hover:text-white rounded transition-colors"
               title="Manage alert rules">
               🚨 ALERTS
@@ -432,7 +444,7 @@ export default function Home() {
               <span>🌡️</span>
               <span className="text-[10px]">Risk</span>
             </button>
-            <button onClick={() => { setShowAlerts(true); clearNotifications(); }}
+            <button onClick={() => { setShowAlerts(true); markAllRead(); }}
               className="relative flex flex-col items-center gap-0.5 text-xs text-gray-400">
               <span>🚨</span>
               <span className="text-[10px]">Alerts</span>
@@ -484,7 +496,12 @@ export default function Home() {
         )}
 
         {/* ── Alert rule manager modal ─────────────────────── */}
-        {showAlerts && <AlertRuleManager onClose={() => setShowAlerts(false)} />}
+        {showAlerts && (
+          <AlertRuleManager
+            onClose={() => setShowAlerts(false)}
+            onBboxCapture={(cb) => setBboxCaptureCallback(() => cb)}
+          />
+        )}
 
         {/* ── Ollama model management drawer ───────────────── */}
         {showOllamaSettings && (
