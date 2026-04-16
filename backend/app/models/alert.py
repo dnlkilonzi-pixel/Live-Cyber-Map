@@ -14,11 +14,11 @@ from app.core.database import Base
 
 
 class AlertCondition(str, enum.Enum):
-    RISK_ABOVE = "risk_above"          # country risk_score > threshold
-    ATTACK_TYPE = "attack_type"        # attack of specific type detected
-    PRICE_CHANGE = "price_change"      # asset price change > threshold %
-    BBOX = "bbox"                      # attack destination inside lat/lng bounding box
-    ANOMALY_SCORE = "anomaly_score"    # anomaly score exceeds threshold
+    RISK_ABOVE = "risk_above"  # country risk_score > threshold
+    ATTACK_TYPE = "attack_type"  # attack of specific type detected
+    PRICE_CHANGE = "price_change"  # asset price change > threshold %
+    BBOX = "bbox"  # attack destination inside lat/lng bounding box
+    ANOMALY_SCORE = "anomaly_score"  # anomaly score exceeds threshold
 
 
 class AlertRule(Base):
@@ -28,12 +28,20 @@ class AlertRule(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    condition: Mapped[str] = mapped_column(String(50), nullable=False)  # AlertCondition value
+    condition: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )  # AlertCondition value
 
     # Condition parameters (nullable; which ones apply depends on condition type)
-    target: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)   # country iso2, attack type, or asset symbol
-    threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)    # numeric threshold
-    bbox: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)     # geofence: "lat_min,lng_min,lat_max,lng_max"
+    target: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True
+    )  # country iso2, attack type, or asset symbol
+    threshold: Mapped[Optional[float]] = mapped_column(
+        Float, nullable=True
+    )  # numeric threshold
+    bbox: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True
+    )  # geofence: "lat_min,lng_min,lat_max,lng_max"
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -46,6 +54,7 @@ class AlertRule(Base):
 # ---------------------------------------------------------------------------
 # Pydantic schemas
 # ---------------------------------------------------------------------------
+
 
 class AlertRuleCreate(BaseModel):
     name: str

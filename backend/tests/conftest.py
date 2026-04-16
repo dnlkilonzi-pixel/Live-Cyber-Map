@@ -15,5 +15,7 @@ def anyio_backend():
 @pytest_asyncio.fixture
 async def client():
     """Async HTTPX client wired directly to the FastAPI app (no live server needed)."""
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         yield ac

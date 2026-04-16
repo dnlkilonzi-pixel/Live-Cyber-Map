@@ -29,21 +29,22 @@ logger = logging.getLogger(__name__)
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TickerQuote:
     symbol: str
     name: str
     price: float
-    change: float          # absolute
-    change_pct: float      # percentage
+    change: float  # absolute
+    change_pct: float  # percentage
     volume: Optional[float]
     market_cap: Optional[float]
     high_24h: Optional[float]
     low_24h: Optional[float]
-    asset_class: str        # "stock" | "crypto" | "commodity" | "index" | "forex"
+    asset_class: str  # "stock" | "crypto" | "commodity" | "index" | "forex"
     exchange: Optional[str]
-    last_updated: float     # Unix timestamp
-    is_real: bool = False   # True when backed by a live API; False when simulated
+    last_updated: float  # Unix timestamp
+    is_real: bool = False  # True when backed by a live API; False when simulated
 
 
 @dataclass
@@ -152,9 +153,9 @@ FOREX_PAIRS: List[Tuple[str, str, float]] = [
 class FinancialDataService:
     """Fetches and caches financial market data from free public APIs."""
 
-    CRYPTO_TTL = 60       # 1 minute
-    STOCK_TTL = 120       # 2 minutes
-    COMMODITY_TTL = 300   # 5 minutes
+    CRYPTO_TTL = 60  # 1 minute
+    STOCK_TTL = 120  # 2 minutes
+    COMMODITY_TTL = 300  # 5 minutes
 
     def __init__(self) -> None:
         self._market: MarketSummary = MarketSummary()
@@ -227,13 +228,15 @@ class FinancialDataService:
                 # Persist a sample of real quotes every cycle
                 async with self._lock:
                     all_real = [
-                        q for group in [
+                        q
+                        for group in [
                             self._market.indices,
                             self._market.stocks,
                             self._market.forex,
                             self._market.commodities,
                         ]
-                        for q in group if q.is_real
+                        for q in group
+                        if q.is_real
                     ]
                 if all_real:
                     asyncio.create_task(self._persist_financial_snapshot(all_real))
@@ -326,15 +329,18 @@ class FinancialDataService:
         try:
             from app.core.database import AsyncSessionLocal
             from app.models.financial import FinancialSnapshot
+
             async with AsyncSessionLocal() as session:
                 for q in quotes:
-                    session.add(FinancialSnapshot(
-                        symbol=q.symbol,
-                        asset_class=q.asset_class,
-                        price=q.price,
-                        change_pct=q.change_pct,
-                        is_real=q.is_real,
-                    ))
+                    session.add(
+                        FinancialSnapshot(
+                            symbol=q.symbol,
+                            asset_class=q.asset_class,
+                            price=q.price,
+                            change_pct=q.change_pct,
+                            is_real=q.is_real,
+                        )
+                    )
                 await session.commit()
         except Exception as exc:
             logger.debug("Financial persistence error: %s", exc)
@@ -355,10 +361,13 @@ class FinancialDataService:
         else:
             await self._update_simulated_stocks()
 
-    def _yfinance_fetch(self, symbols: List[str], asset_class: str) -> List[TickerQuote]:
+    def _yfinance_fetch(
+        self, symbols: List[str], asset_class: str
+    ) -> List[TickerQuote]:
         """Synchronous yfinance download – run in a thread executor."""
         try:
             import yfinance as yf  # type: ignore[import]
+
             data = yf.download(
                 tickers=symbols,
                 period="2d",
@@ -380,7 +389,11 @@ class FinancialDataService:
                     if len(symbols) == 1:
                         df = data
                     else:
-                        df = data[sym] if sym in data.columns.get_level_values(0) else data
+                        df = (
+                            data[sym]
+                            if sym in data.columns.get_level_values(0)
+                            else data
+                        )
 
                     if df.empty or len(df) < 1:
                         continue
@@ -466,13 +479,19 @@ class FinancialDataService:
                     else:
                         rate_base = rates.get(base)
                         rate_quote = rates.get(quote)
-                        rate = (rate_quote / rate_base) if (rate_base and rate_quote) else None
+                        rate = (
+                            (rate_quote / rate_base)
+                            if (rate_base and rate_quote)
+                            else None
+                        )
 
                     if rate and not math.isnan(rate):
                         prev = q.price
                         q.price = round(rate, 6)
                         q.change = round(q.price - prev, 6)
-                        q.change_pct = round((q.price - prev) / prev * 100, 4) if prev else 0.0
+                        q.change_pct = (
+                            round((q.price - prev) / prev * 100, 4) if prev else 0.0
+                        )
                         q.last_updated = now
                         q.is_real = True
                         self._forex_prices[q.symbol] = rate
@@ -485,17 +504,37 @@ class FinancialDataService:
 
     # Seed prices (approximate real values, updated manually periodically)
     _STOCK_SEEDS: Dict[str, float] = {
-        "AAPL": 185.0, "MSFT": 420.0, "GOOGL": 175.0, "AMZN": 185.0,
-        "NVDA": 875.0, "META": 510.0, "TSLA": 175.0, "JPM": 198.0,
-        "BAC": 35.0, "XOM": 108.0, "V": 285.0, "JNJ": 155.0,
-        "WMT": 185.0, "UNH": 530.0, "BRK-B": 375.0, "TSM": 145.0,
-        "ASML": 900.0, "SAP": 195.0, "TM": 225.0, "BABA": 75.0,
+        "AAPL": 185.0,
+        "MSFT": 420.0,
+        "GOOGL": 175.0,
+        "AMZN": 185.0,
+        "NVDA": 875.0,
+        "META": 510.0,
+        "TSLA": 175.0,
+        "JPM": 198.0,
+        "BAC": 35.0,
+        "XOM": 108.0,
+        "V": 285.0,
+        "JNJ": 155.0,
+        "WMT": 185.0,
+        "UNH": 530.0,
+        "BRK-B": 375.0,
+        "TSM": 145.0,
+        "ASML": 900.0,
+        "SAP": 195.0,
+        "TM": 225.0,
+        "BABA": 75.0,
     }
 
     _INDEX_SEEDS: Dict[str, float] = {
-        "^GSPC": 5200.0, "^DJI": 39000.0, "^IXIC": 16300.0,
-        "^FTSE": 7700.0, "^N225": 38500.0, "^HSI": 17000.0,
-        "^GDAXI": 18000.0, "^FCHI": 8100.0,
+        "^GSPC": 5200.0,
+        "^DJI": 39000.0,
+        "^IXIC": 16300.0,
+        "^FTSE": 7700.0,
+        "^N225": 38500.0,
+        "^HSI": 17000.0,
+        "^GDAXI": 18000.0,
+        "^FCHI": 8100.0,
     }
 
     def _init_simulated_data(self) -> None:
@@ -509,14 +548,17 @@ class FinancialDataService:
             price = base * (1 + chg_pct / 100)
             stocks.append(
                 TickerQuote(
-                    symbol=sym, name=name,
+                    symbol=sym,
+                    name=name,
                     price=round(price, 2),
                     change=round(price * chg_pct / 100, 2),
                     change_pct=round(chg_pct, 2),
                     volume=random.uniform(5e6, 8e7),
                     market_cap=None,
-                    high_24h=None, low_24h=None,
-                    asset_class="stock", exchange=exchange,
+                    high_24h=None,
+                    low_24h=None,
+                    asset_class="stock",
+                    exchange=exchange,
                     last_updated=now,
                 )
             )
@@ -529,13 +571,17 @@ class FinancialDataService:
             price = base * (1 + chg_pct / 100)
             indices.append(
                 TickerQuote(
-                    symbol=sym, name=name,
+                    symbol=sym,
+                    name=name,
                     price=round(price, 2),
                     change=round(price * chg_pct / 100, 2),
                     change_pct=round(chg_pct, 2),
-                    volume=None, market_cap=None,
-                    high_24h=None, low_24h=None,
-                    asset_class="index", exchange=exchange,
+                    volume=None,
+                    market_cap=None,
+                    high_24h=None,
+                    low_24h=None,
+                    asset_class="index",
+                    exchange=exchange,
                     last_updated=now,
                 )
             )
@@ -549,13 +595,17 @@ class FinancialDataService:
             self._commodity_prices[sym] = price_new
             commodities.append(
                 TickerQuote(
-                    symbol=sym, name=f"{name} ({unit})",
+                    symbol=sym,
+                    name=f"{name} ({unit})",
                     price=round(price_new, 3),
                     change=round(price_new * chg_pct / 100, 3),
                     change_pct=round(chg_pct, 2),
-                    volume=None, market_cap=None,
-                    high_24h=None, low_24h=None,
-                    asset_class="commodity", exchange="COMEX",
+                    volume=None,
+                    market_cap=None,
+                    high_24h=None,
+                    low_24h=None,
+                    asset_class="commodity",
+                    exchange="COMEX",
                     last_updated=now,
                 )
             )
@@ -566,12 +616,17 @@ class FinancialDataService:
             rate = self._forex_prices[pair]
             forex.append(
                 TickerQuote(
-                    symbol=pair, name=name,
+                    symbol=pair,
+                    name=name,
                     price=round(rate, 4),
-                    change=0.0, change_pct=0.0,
-                    volume=None, market_cap=None,
-                    high_24h=None, low_24h=None,
-                    asset_class="forex", exchange="FX",
+                    change=0.0,
+                    change_pct=0.0,
+                    volume=None,
+                    market_cap=None,
+                    high_24h=None,
+                    low_24h=None,
+                    asset_class="forex",
+                    exchange="FX",
                     last_updated=now,
                 )
             )
@@ -579,10 +634,21 @@ class FinancialDataService:
         # Simulated crypto until CoinGecko responds
         crypto = []
         _CRYPTO_SEEDS = {
-            "BTC": 67000, "ETH": 3500, "BNB": 400, "SOL": 175,
-            "XRP": 0.55, "ADA": 0.45, "AVAX": 38, "DOGE": 0.09,
-            "DOT": 8.5, "LINK": 18, "UNI": 11, "LTC": 95,
-            "BCH": 450, "XLM": 0.12, "XMR": 165,
+            "BTC": 67000,
+            "ETH": 3500,
+            "BNB": 400,
+            "SOL": 175,
+            "XRP": 0.55,
+            "ADA": 0.45,
+            "AVAX": 38,
+            "DOGE": 0.09,
+            "DOT": 8.5,
+            "LINK": 18,
+            "UNI": 11,
+            "LTC": 95,
+            "BCH": 450,
+            "XLM": 0.12,
+            "XMR": 165,
         }
         for cid, sym in CRYPTO_IDS:
             base = _CRYPTO_SEEDS.get(sym, 1.0)
@@ -590,13 +656,17 @@ class FinancialDataService:
             price = base * (1 + chg_pct / 100)
             crypto.append(
                 TickerQuote(
-                    symbol=sym, name=sym,
+                    symbol=sym,
+                    name=sym,
                     price=round(price, 4),
                     change=round(price * chg_pct / 100, 4),
                     change_pct=round(chg_pct, 2),
-                    volume=None, market_cap=None,
-                    high_24h=None, low_24h=None,
-                    asset_class="crypto", exchange="CoinGecko",
+                    volume=None,
+                    market_cap=None,
+                    high_24h=None,
+                    low_24h=None,
+                    asset_class="crypto",
+                    exchange="CoinGecko",
                     last_updated=now,
                 )
             )
@@ -626,7 +696,11 @@ class FinancialDataService:
             now = time.time()
             for q in self._market.commodities:
                 sym = q.symbol.split(" ")[0]  # strip unit suffix
-                _ = sym if sym in self._commodity_prices else q.symbol.split("(")[0].strip()
+                _ = (
+                    sym
+                    if sym in self._commodity_prices
+                    else q.symbol.split("(")[0].strip()
+                )
                 # Find the matching key
                 match_key = next(
                     (k for k in self._commodity_prices if k in q.symbol), None
@@ -643,17 +717,17 @@ class FinancialDataService:
     # yfinance tickers for key commodities (futures)
     _COMMODITY_YFINANCE: Dict[str, Tuple[str, str, str]] = {
         # yf_symbol -> (internal_key, display_name, unit)
-        "GC=F":  ("GOLD",       "Gold",              "USD/troy oz"),
-        "SI=F":  ("SILVER",     "Silver",             "USD/troy oz"),
-        "CL=F":  ("CRUDE_OIL",  "Crude Oil (WTI)",    "USD/bbl"),
-        "BZ=F":  ("BRENT",      "Brent Crude",        "USD/bbl"),
-        "NG=F":  ("NATURAL_GAS","Natural Gas",        "USD/MMBtu"),
-        "HG=F":  ("COPPER",     "Copper",             "USD/lb"),
-        "PL=F":  ("PLATINUM",   "Platinum",           "USD/troy oz"),
-        "PA=F":  ("PALLADIUM",  "Palladium",          "USD/troy oz"),
-        "ZW=F":  ("WHEAT",      "Wheat",              "USD/bu"),
-        "ZC=F":  ("CORN",       "Corn",               "USD/bu"),
-        "ZS=F":  ("SOYBEANS",   "Soybeans",           "USD/bu"),
+        "GC=F": ("GOLD", "Gold", "USD/troy oz"),
+        "SI=F": ("SILVER", "Silver", "USD/troy oz"),
+        "CL=F": ("CRUDE_OIL", "Crude Oil (WTI)", "USD/bbl"),
+        "BZ=F": ("BRENT", "Brent Crude", "USD/bbl"),
+        "NG=F": ("NATURAL_GAS", "Natural Gas", "USD/MMBtu"),
+        "HG=F": ("COPPER", "Copper", "USD/lb"),
+        "PL=F": ("PLATINUM", "Platinum", "USD/troy oz"),
+        "PA=F": ("PALLADIUM", "Palladium", "USD/troy oz"),
+        "ZW=F": ("WHEAT", "Wheat", "USD/bu"),
+        "ZC=F": ("CORN", "Corn", "USD/bu"),
+        "ZS=F": ("SOYBEANS", "Soybeans", "USD/bu"),
     }
 
     async def _fetch_commodities_yfinance(self) -> None:
@@ -687,6 +761,7 @@ class FinancialDataService:
         """Synchronous yfinance download for commodity futures – run in executor."""
         try:
             import yfinance as yf  # type: ignore[import]
+
             data = yf.download(
                 tickers=symbols,
                 period="2d",
@@ -697,12 +772,20 @@ class FinancialDataService:
                 threads=True,
             )
             quotes: List[TickerQuote] = []
-            for yf_sym, (internal_key, display_name, unit) in self._COMMODITY_YFINANCE.items():
+            for yf_sym, (
+                internal_key,
+                display_name,
+                unit,
+            ) in self._COMMODITY_YFINANCE.items():
                 try:
                     if len(symbols) == 1:
                         df = data
                     else:
-                        df = data[yf_sym] if yf_sym in data.columns.get_level_values(0) else None
+                        df = (
+                            data[yf_sym]
+                            if yf_sym in data.columns.get_level_values(0)
+                            else None
+                        )
                     if df is None or df.empty or len(df) < 1:
                         continue
                     row = df.iloc[-1]

@@ -80,26 +80,31 @@ def _make_aggregator() -> NewsAggregator:
 # _text helper
 # ---------------------------------------------------------------------------
 
+
 def test_text_finds_child():
     import xml.etree.ElementTree as ET
+
     el = ET.fromstring("<item><title>Hello</title></item>")
     assert NewsAggregator._text(el, ["title"]) == "Hello"
 
 
 def test_text_returns_empty_if_not_found():
     import xml.etree.ElementTree as ET
+
     el = ET.fromstring("<item><link>url</link></item>")
     assert NewsAggregator._text(el, ["title"]) == ""
 
 
 def test_text_tries_multiple_tags():
     import xml.etree.ElementTree as ET
+
     el = ET.fromstring("<item><description>Desc</description></item>")
     assert NewsAggregator._text(el, ["summary", "description"]) == "Desc"
 
 
 def test_text_returns_empty_on_no_text():
     import xml.etree.ElementTree as ET
+
     el = ET.fromstring("<item><title/></item>")
     assert NewsAggregator._text(el, ["title"]) == ""
 
@@ -108,14 +113,17 @@ def test_text_returns_empty_on_no_text():
 # _attr helper
 # ---------------------------------------------------------------------------
 
+
 def test_attr_finds_attribute():
     import xml.etree.ElementTree as ET
+
     el = ET.fromstring('<feed><link href="https://example.com"/></feed>')
     assert NewsAggregator._attr(el, "link", "href") == "https://example.com"
 
 
 def test_attr_returns_empty_if_tag_missing():
     import xml.etree.ElementTree as ET
+
     el = ET.fromstring("<feed><title>T</title></feed>")
     assert NewsAggregator._attr(el, "link", "href") == ""
 
@@ -124,11 +132,13 @@ def test_attr_returns_empty_if_tag_missing():
 # _parse_date
 # ---------------------------------------------------------------------------
 
+
 def test_parse_date_rfc2822():
     ts = NewsAggregator._parse_date("Mon, 01 Jan 2024 12:00:00 +0000")
     assert ts > 0
     # 2024-01-01 12:00:00 UTC
     from datetime import datetime, timezone
+
     dt = datetime.fromtimestamp(ts, tz=timezone.utc)
     assert dt.year == 2024
     assert dt.month == 1
@@ -137,6 +147,7 @@ def test_parse_date_rfc2822():
 def test_parse_date_iso8601():
     ts = NewsAggregator._parse_date("2024-06-15T09:30:00Z")
     from datetime import datetime, timezone
+
     dt = datetime.fromtimestamp(ts, tz=timezone.utc)
     assert dt.year == 2024
     assert dt.month == 6
@@ -159,6 +170,7 @@ def test_parse_date_garbage_returns_recent():
 # ---------------------------------------------------------------------------
 # _score_sentiment
 # ---------------------------------------------------------------------------
+
 
 def test_score_sentiment_negative_keywords():
     agg = _make_aggregator()
@@ -188,9 +200,12 @@ def test_score_sentiment_mixed():
 # _parse_rss
 # ---------------------------------------------------------------------------
 
+
 def test_parse_rss_simple():
     agg = _make_aggregator()
-    items = agg._parse_rss(_RSS_SIMPLE, _make_feed("BBC", "https://bbc.com/rss", "world"))
+    items = agg._parse_rss(
+        _RSS_SIMPLE, _make_feed("BBC", "https://bbc.com/rss", "world")
+    )
     assert len(items) == 2
     assert items[0].title == "Breaking News"
     assert items[0].source == "BBC"
@@ -231,6 +246,7 @@ def test_parse_rss_bad_xml_returns_empty():
 
 def test_parse_rss_id_is_md5_of_url():
     import hashlib
+
     agg = _make_aggregator()
     items = agg._parse_rss(_RSS_SIMPLE, _make_feed())
     expected_id = hashlib.md5("https://example.com/article/1".encode()).hexdigest()
@@ -247,6 +263,7 @@ def test_parse_rss_sentiment_assigned():
 # ---------------------------------------------------------------------------
 # _item_to_dict
 # ---------------------------------------------------------------------------
+
 
 def test_item_to_dict_round_trips():
     item = NewsItem(
@@ -272,6 +289,7 @@ def test_item_to_dict_round_trips():
 # set_redis
 # ---------------------------------------------------------------------------
 
+
 def test_set_redis_stores_client():
     agg = _make_aggregator()
     mock_redis = MagicMock()
@@ -289,6 +307,7 @@ def test_set_redis_none():
 # get_categories
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_get_categories_returns_list():
     agg = _make_aggregator()
@@ -303,6 +322,7 @@ async def test_get_categories_returns_list():
 # get_news – filtering
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_get_news_empty_initially():
     agg = _make_aggregator()
@@ -314,8 +334,19 @@ async def test_get_news_empty_initially():
 async def test_get_news_filter_by_category():
     agg = _make_aggregator()
     agg._all_items = [
-        NewsItem("1", "Title A", "", "https://a.com", "src", "world", "global", time.time()),
-        NewsItem("2", "Title B", "", "https://b.com", "src", "technology", "global", time.time()),
+        NewsItem(
+            "1", "Title A", "", "https://a.com", "src", "world", "global", time.time()
+        ),
+        NewsItem(
+            "2",
+            "Title B",
+            "",
+            "https://b.com",
+            "src",
+            "technology",
+            "global",
+            time.time(),
+        ),
     ]
     result = await agg.get_news(category="world")
     assert len(result) == 1
@@ -341,7 +372,16 @@ async def test_get_news_filter_by_region():
 async def test_get_news_limit_respected():
     agg = _make_aggregator()
     agg._all_items = [
-        NewsItem(str(i), f"Title {i}", "", f"https://{i}.com", "src", "world", "global", float(i))
+        NewsItem(
+            str(i),
+            f"Title {i}",
+            "",
+            f"https://{i}.com",
+            "src",
+            "world",
+            "global",
+            float(i),
+        )
         for i in range(20)
     ]
     result = await agg.get_news(limit=5)
@@ -353,7 +393,9 @@ async def test_get_news_sorted_by_recency():
     agg = _make_aggregator()
     now = time.time()
     agg._all_items = [
-        NewsItem("old", "Old", "", "https://old.com", "src", "world", "global", now - 1000),
+        NewsItem(
+            "old", "Old", "", "https://old.com", "src", "world", "global", now - 1000
+        ),
         NewsItem("new", "New", "", "https://new.com", "src", "world", "global", now),
     ]
     result = await agg.get_news(limit=10)
@@ -363,6 +405,7 @@ async def test_get_news_sorted_by_recency():
 # ---------------------------------------------------------------------------
 # _fetch_feed – mocked httpx
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_fetch_feed_success():
@@ -407,6 +450,7 @@ async def test_fetch_feed_non_200_returns_empty():
 # ---------------------------------------------------------------------------
 # start / stop lifecycle
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_start_creates_background_task():

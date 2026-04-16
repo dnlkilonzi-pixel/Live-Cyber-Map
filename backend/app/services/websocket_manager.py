@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 _REDIS_CHANNEL = "attacks"
 _MAX_CONNECTIONS_PER_IP = 5
 # Rate-limit: max new WS connections per IP per time window
-_WS_RATE_WINDOW = 60.0   # seconds
-_WS_RATE_MAX = 20        # new connections allowed per window per IP
+_WS_RATE_WINDOW = 60.0  # seconds
+_WS_RATE_MAX = 20  # new connections allowed per window per IP
 
 
 class WebSocketManager:
@@ -30,7 +30,7 @@ class WebSocketManager:
 
     def __init__(self) -> None:
         self._active: Set[WebSocket] = set()
-        self._redis = None        # injected at startup
+        self._redis = None  # injected at startup
         self._sub_task: Optional[asyncio.Task] = None  # type: ignore[type-arg]
         # Channel → set of WebSockets (for future targeted broadcasts)
         self._channels: Dict[str, Set[WebSocket]] = {}
@@ -57,7 +57,8 @@ class WebSocketManager:
         if self._ip_counts[client_ip] >= _MAX_CONNECTIONS_PER_IP:
             logger.warning(
                 "WS connection refused for %s — already at %d connections",
-                client_ip, _MAX_CONNECTIONS_PER_IP,
+                client_ip,
+                _MAX_CONNECTIONS_PER_IP,
             )
             await websocket.accept()
             await websocket.close(code=1008, reason="Too many connections from this IP")
@@ -72,7 +73,9 @@ class WebSocketManager:
         if len(self._ip_connect_times[client_ip]) >= _WS_RATE_MAX:
             logger.warning(
                 "WS connection rate-limit hit for %s — %d attempts in %.0fs",
-                client_ip, len(self._ip_connect_times[client_ip]), _WS_RATE_WINDOW,
+                client_ip,
+                len(self._ip_connect_times[client_ip]),
+                _WS_RATE_WINDOW,
             )
             await websocket.accept()
             await websocket.close(code=1008, reason="Connection rate limit exceeded")
@@ -84,7 +87,9 @@ class WebSocketManager:
         self._ip_counts[client_ip] += 1
         logger.info(
             "WS connected [%s] — total: %d (IP connections: %d)",
-            client_ip, len(self._active), self._ip_counts[client_ip],
+            client_ip,
+            len(self._active),
+            self._ip_counts[client_ip],
         )
         return True
 
@@ -187,7 +192,9 @@ class WebSocketManager:
     async def start_redis_subscriber(self) -> None:
         """Start the background task that forwards Redis messages to WS clients."""
         if self._redis is None:
-            logger.warning("Redis not available — WS broadcast will use direct path only.")
+            logger.warning(
+                "Redis not available — WS broadcast will use direct path only."
+            )
             return
         self._sub_task = asyncio.create_task(self._redis_listener())
         logger.info("WebSocketManager Redis subscriber started.")

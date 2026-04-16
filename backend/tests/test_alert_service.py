@@ -18,6 +18,7 @@ from app.services.alert_service import AlertService
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_rule(
     rule_id: int,
     condition: str = "anomaly_score",
@@ -40,6 +41,7 @@ def _make_rule(
 # ---------------------------------------------------------------------------
 # check_anomaly_score
 # ---------------------------------------------------------------------------
+
 
 class TestCheckAnomalyScore:
     """Tests for AlertService.check_anomaly_score."""
@@ -93,10 +95,12 @@ class TestCheckAnomalyScore:
     @pytest.mark.anyio
     async def test_fires_multiple_rules_independently(self):
         svc = AlertService()
-        await svc.reload_rules([
-            _make_rule(1, threshold=0.5),
-            _make_rule(2, threshold=0.8),
-        ])
+        await svc.reload_rules(
+            [
+                _make_rule(1, threshold=0.5),
+                _make_rule(2, threshold=0.8),
+            ]
+        )
         # score=0.7: only rule 1 (threshold 0.5) should fire
         fired_one = await svc.check_anomaly_score(0.7)
         assert len(fired_one) == 1
@@ -104,10 +108,12 @@ class TestCheckAnomalyScore:
 
         # Fresh service to avoid cooldown interference
         svc2 = AlertService()
-        await svc2.reload_rules([
-            _make_rule(1, threshold=0.5),
-            _make_rule(2, threshold=0.8),
-        ])
+        await svc2.reload_rules(
+            [
+                _make_rule(1, threshold=0.5),
+                _make_rule(2, threshold=0.8),
+            ]
+        )
         # score=0.9: both rules should fire
         fired_both = await svc2.check_anomaly_score(0.9)
         assert len(fired_both) == 2
@@ -171,6 +177,7 @@ class TestCheckAnomalyScore:
 # ---------------------------------------------------------------------------
 # Attack-feed pagination logic (pure Python, no HTTP)
 # ---------------------------------------------------------------------------
+
 
 class TestAttackFeedPagination:
     """Verify the pagination arithmetic used by GET /api/attacks/recent.
@@ -239,6 +246,7 @@ class TestAttackFeedPagination:
 # AlertService.check_country_risk (bonus coverage)
 # ---------------------------------------------------------------------------
 
+
 class TestCheckCountryRisk:
     """Spot-check the country-risk alert path."""
 
@@ -274,6 +282,7 @@ class TestCheckCountryRisk:
 # ---------------------------------------------------------------------------
 # AlertService.check_attack (ATTACK_TYPE condition, by type filter)
 # ---------------------------------------------------------------------------
+
 
 class TestCheckAttack:
     """Tests for AlertService.check_attack — standalone method."""
@@ -323,6 +332,7 @@ class TestCheckAttack:
 # ---------------------------------------------------------------------------
 # AlertService.check_price_change
 # ---------------------------------------------------------------------------
+
 
 class TestCheckPriceChange:
     """Tests for AlertService.check_price_change."""
@@ -381,6 +391,7 @@ class TestCheckPriceChange:
 # ---------------------------------------------------------------------------
 # AlertService lifecycle: start / stop
 # ---------------------------------------------------------------------------
+
 
 class TestAlertServiceLifecycle:
     """Tests for start() and stop() task management."""

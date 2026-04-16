@@ -17,6 +17,7 @@ router = APIRouter()
 # Pydantic models
 # ---------------------------------------------------------------------------
 
+
 class TickerResponse(BaseModel):
     symbol: str
     name: str
@@ -37,6 +38,7 @@ class TickerResponse(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/crypto",
     response_model=List[TickerResponse],
@@ -45,6 +47,7 @@ class TickerResponse(BaseModel):
 )
 async def get_crypto():
     from app.services.financial_data import FinancialDataService, financial_service
+
     quotes = await financial_service.get_crypto()
     return [TickerResponse(**FinancialDataService.quote_to_dict(q)) for q in quotes]
 
@@ -57,6 +60,7 @@ async def get_crypto():
 )
 async def get_stocks():
     from app.services.financial_data import FinancialDataService, financial_service
+
     quotes = await financial_service.get_stocks()
     return [TickerResponse(**FinancialDataService.quote_to_dict(q)) for q in quotes]
 
@@ -69,6 +73,7 @@ async def get_stocks():
 )
 async def get_commodities():
     from app.services.financial_data import FinancialDataService, financial_service
+
     quotes = await financial_service.get_commodities()
     return [TickerResponse(**FinancialDataService.quote_to_dict(q)) for q in quotes]
 
@@ -81,6 +86,7 @@ async def get_commodities():
 )
 async def get_indices():
     from app.services.financial_data import FinancialDataService, financial_service
+
     quotes = await financial_service.get_indices()
     return [TickerResponse(**FinancialDataService.quote_to_dict(q)) for q in quotes]
 
@@ -93,6 +99,7 @@ async def get_indices():
 )
 async def get_forex():
     from app.services.financial_data import FinancialDataService, financial_service
+
     quotes = await financial_service.get_forex()
     return [TickerResponse(**FinancialDataService.quote_to_dict(q)) for q in quotes]
 
@@ -110,7 +117,9 @@ async def get_market_summary():
         "indices": [FinancialDataService.quote_to_dict(q) for q in market.indices],
         "stocks": [FinancialDataService.quote_to_dict(q) for q in market.stocks],
         "crypto": [FinancialDataService.quote_to_dict(q) for q in market.crypto],
-        "commodities": [FinancialDataService.quote_to_dict(q) for q in market.commodities],
+        "commodities": [
+            FinancialDataService.quote_to_dict(q) for q in market.commodities
+        ],
         "forex": [FinancialDataService.quote_to_dict(q) for q in market.forex],
         "last_updated": market.last_updated,
     }

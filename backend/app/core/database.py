@@ -42,6 +42,7 @@ AsyncSessionLocal = async_sessionmaker(
 # Declarative base
 # ---------------------------------------------------------------------------
 
+
 class Base(DeclarativeBase):
     """Shared declarative base for all ORM models."""
 
@@ -49,6 +50,7 @@ class Base(DeclarativeBase):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 async def get_db() -> AsyncSession:  # type: ignore[return]
     """FastAPI dependency that yields an async database session."""

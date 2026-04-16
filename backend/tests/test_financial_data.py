@@ -32,6 +32,7 @@ from app.services.financial_data import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_service() -> FinancialDataService:
     svc = FinancialDataService()
     return svc
@@ -67,6 +68,7 @@ def _make_ticker(symbol="AAPL", asset_class="stock") -> TickerQuote:
 # _init_simulated_data (called by start)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_start_populates_simulated_data():
     svc = _make_service()
@@ -96,6 +98,7 @@ async def test_init_simulated_data_prices_positive():
 # ---------------------------------------------------------------------------
 # Public getters
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_get_market_summary_returns_market_summary():
@@ -161,6 +164,7 @@ async def test_getters_return_copies():
 # set_redis
 # ---------------------------------------------------------------------------
 
+
 def test_set_redis_stores_client():
     svc = _make_service()
     mock_redis = MagicMock()
@@ -178,10 +182,19 @@ def test_set_redis_none():
 # quote_to_dict
 # ---------------------------------------------------------------------------
 
+
 def test_quote_to_dict_contains_required_keys():
     q = _make_ticker("AAPL", "stock")
     d = FinancialDataService.quote_to_dict(q)
-    for key in ("symbol", "name", "price", "change", "change_pct", "asset_class", "is_real"):
+    for key in (
+        "symbol",
+        "name",
+        "price",
+        "change",
+        "change_pct",
+        "asset_class",
+        "is_real",
+    ):
         assert key in d, f"Missing key: {key}"
 
 
@@ -197,6 +210,7 @@ def test_quote_to_dict_values_match():
 # ---------------------------------------------------------------------------
 # _drift_crypto
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_drift_crypto_changes_prices():
@@ -222,6 +236,7 @@ async def test_drift_crypto_prices_stay_positive():
 # ---------------------------------------------------------------------------
 # _apply_forex_rates
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_apply_forex_rates_updates_eur_usd():
@@ -252,6 +267,7 @@ async def test_apply_forex_rates_skips_missing_rates():
 # _fetch_crypto – mocked httpx
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_fetch_crypto_200_updates_market():
     svc = _make_service()
@@ -276,7 +292,9 @@ async def test_fetch_crypto_200_updates_market():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(return_value=mock_resp)
 
-    with patch("app.services.financial_data.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.financial_data.httpx.AsyncClient", return_value=mock_client
+    ):
         await svc._fetch_crypto()
 
     btc = next((q for q in svc._market.crypto if q.symbol == "BTC"), None)
@@ -296,7 +314,9 @@ async def test_fetch_crypto_429_keeps_existing_data():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(return_value=mock_resp)
 
-    with patch("app.services.financial_data.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.financial_data.httpx.AsyncClient", return_value=mock_client
+    ):
         await svc._fetch_crypto()
 
     # Existing data preserved (with drift applied)
@@ -314,7 +334,9 @@ async def test_fetch_crypto_exception_triggers_drift():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
 
-    with patch("app.services.financial_data.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.financial_data.httpx.AsyncClient", return_value=mock_client
+    ):
         await svc._fetch_crypto()
 
     prices_after = [q.price for q in svc._market.crypto]
@@ -325,6 +347,7 @@ async def test_fetch_crypto_exception_triggers_drift():
 # ---------------------------------------------------------------------------
 # _fetch_forex_exchangerate – mocked httpx
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_fetch_forex_200_applies_real_rates():
@@ -338,7 +361,9 @@ async def test_fetch_forex_200_applies_real_rates():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(return_value=mock_resp)
 
-    with patch("app.services.financial_data.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.financial_data.httpx.AsyncClient", return_value=mock_client
+    ):
         await svc._fetch_forex_exchangerate()
 
     # At least one forex quote should have is_real = True (if pair mapped)
@@ -357,7 +382,9 @@ async def test_fetch_forex_exception_falls_back_to_simulation():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
 
-    with patch("app.services.financial_data.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.financial_data.httpx.AsyncClient", return_value=mock_client
+    ):
         await svc._fetch_forex_exchangerate()
 
     # After simulation update prices should have drifted (or at minimum not crashed)
@@ -367,6 +394,7 @@ async def test_fetch_forex_exception_falls_back_to_simulation():
 # ---------------------------------------------------------------------------
 # _update_simulated_stocks
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_update_simulated_stocks_changes_prices():
@@ -392,6 +420,7 @@ async def test_update_simulated_stocks_prices_stay_positive():
 # _update_simulated_forex
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_update_simulated_forex_changes_prices():
     svc = _make_service()
@@ -405,6 +434,7 @@ async def test_update_simulated_forex_changes_prices():
 # ---------------------------------------------------------------------------
 # start / stop lifecycle
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_start_stop_lifecycle():

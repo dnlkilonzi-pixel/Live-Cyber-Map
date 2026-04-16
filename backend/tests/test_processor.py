@@ -21,6 +21,7 @@ from app.services.processor import AttackProcessor, _parse_timestamp
 # _parse_timestamp helper
 # ---------------------------------------------------------------------------
 
+
 def test_parse_timestamp_iso_utc():
     ts = "2024-01-15T12:00:00+00:00"
     dt = _parse_timestamp(ts)
@@ -37,6 +38,7 @@ def test_parse_timestamp_z_suffix():
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _minimal_event(**kwargs) -> dict:
     base = {
@@ -66,6 +68,7 @@ def _make_processor(**kwargs) -> AttackProcessor:
 # ---------------------------------------------------------------------------
 # process_event – geo enrichment
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_process_event_skips_geo_if_already_set():
@@ -118,15 +121,19 @@ async def test_process_event_enriches_dest_geo_if_missing():
 # process_event – severity bonus
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
-@pytest.mark.parametrize("attack_type,base,expected_delta", [
-    ("ZeroDay", 5, 3),
-    ("Ransomware", 5, 2),
-    ("Intrusion", 5, 1),
-    ("BruteForce", 5, -1),
-    ("XSS", 5, -2),
-    ("SQLInjection", 5, 0),
-])
+@pytest.mark.parametrize(
+    "attack_type,base,expected_delta",
+    [
+        ("ZeroDay", 5, 3),
+        ("Ransomware", 5, 2),
+        ("Intrusion", 5, 1),
+        ("BruteForce", 5, -1),
+        ("XSS", 5, -2),
+        ("SQLInjection", 5, 0),
+    ],
+)
 async def test_process_event_severity_bonus(attack_type, base, expected_delta):
     p = _make_processor()
     ev = _minimal_event(attack_type=attack_type, severity=base)
@@ -155,6 +162,7 @@ async def test_process_event_severity_clamped_at_1():
 # process_event – cluster_id
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_process_event_cluster_id_format():
     p = _make_processor()
@@ -168,7 +176,9 @@ async def test_process_event_cluster_id_fallback_xx():
     p = _make_processor()
     ev = _minimal_event(attack_type="Malware")
     ev.pop("source_country_code", None)
-    ev["source_country_code"] = "US"  # present in _minimal_event, override to test absence
+    ev["source_country_code"] = (
+        "US"  # present in _minimal_event, override to test absence
+    )
     ev.pop("source_country_code")
     result = await p.process_event(ev)
     assert result["cluster_id"] == "Malware:XX"
@@ -177,6 +187,7 @@ async def test_process_event_cluster_id_fallback_xx():
 # ---------------------------------------------------------------------------
 # process_event – timestamp injection
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_process_event_injects_timestamp_if_missing():
@@ -199,6 +210,7 @@ async def test_process_event_preserves_existing_timestamp():
 # ---------------------------------------------------------------------------
 # get_recent_events
 # ---------------------------------------------------------------------------
+
 
 def test_get_recent_events_empty():
     p = _make_processor()
@@ -224,6 +236,7 @@ def test_get_recent_events_returns_copy():
 # ---------------------------------------------------------------------------
 # _publish_redis
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_publish_redis_skips_when_none():
@@ -253,6 +266,7 @@ async def test_publish_redis_survives_exception():
 # ---------------------------------------------------------------------------
 # _flush_to_db
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_flush_to_db_no_factory_clears_pending():
@@ -298,10 +312,13 @@ async def test_flush_to_db_handles_factory_exception():
 # _check_alerts
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_check_alerts_handles_import_exception():
     p = _make_processor()
-    with patch("app.services.processor.AttackProcessor._check_alerts", wraps=p._check_alerts):
+    with patch(
+        "app.services.processor.AttackProcessor._check_alerts", wraps=p._check_alerts
+    ):
         # Even if alert_service import fails inside the method, it should not raise
         await p._check_alerts({"type": "attack"})
 
@@ -309,6 +326,7 @@ async def test_check_alerts_handles_import_exception():
 # ---------------------------------------------------------------------------
 # start / stop lifecycle
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_start_sets_running_true():
@@ -348,6 +366,7 @@ async def test_stop_flushes_pending_db():
 # ---------------------------------------------------------------------------
 # _consume_loop – end-to-end via queue
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_consume_loop_processes_event_into_history():
@@ -410,6 +429,7 @@ async def test_consume_loop_trims_history_to_max():
 # _flush_loop – exercises periodic DB flush path
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_flush_loop_runs_without_crash():
     """The flush loop should run without raising even with no pending items."""
@@ -426,6 +446,7 @@ async def test_flush_loop_runs_without_crash():
 # _check_alerts – with mocked alert_service
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_check_alerts_broadcasts_fired_alerts():
     p = _make_processor()
@@ -439,6 +460,7 @@ async def test_check_alerts_broadcasts_fired_alerts():
     mock_mgr.broadcast = AsyncMock()
 
     import sys
+
     fake_alert_mod = MagicMock()
     fake_alert_mod.alert_service = mock_svc
     fake_ws_mod = MagicMock()
@@ -474,6 +496,7 @@ async def test_check_alerts_empty_fired_list():
     mock_mgr.broadcast = AsyncMock()
 
     import sys
+
     fake_alert_mod = MagicMock()
     fake_alert_mod.alert_service = mock_svc
     fake_ws_mod = MagicMock()

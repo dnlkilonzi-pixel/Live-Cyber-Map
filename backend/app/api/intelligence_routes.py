@@ -22,6 +22,7 @@ router = APIRouter()
 # Pydantic response models
 # ---------------------------------------------------------------------------
 
+
 class NewsItemResponse(BaseModel):
     id: str
     title: str
@@ -72,6 +73,7 @@ class OllamaStatusResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # News endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/news/by-country/{iso2}",
@@ -129,7 +131,8 @@ async def get_news_by_country(
 
     items = await news_aggregator.get_news(limit=200)
     filtered = [
-        i for i in items
+        i
+        for i in items
         if i.region == iso2_upper
         or (country_name and country_name.lower() in i.title.lower())
     ][:limit]
@@ -190,12 +193,14 @@ async def get_news(
 )
 async def get_categories():
     from app.services.news_aggregator import news_aggregator
+
     return {"categories": await news_aggregator.get_categories()}
 
 
 # ---------------------------------------------------------------------------
 # AI Brief endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/brief",
@@ -267,6 +272,7 @@ async def get_brief(category: str, limit: int = Query(default=15, ge=3, le=50)):
 # Country risk endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/risk",
     response_model=List[CountryRiskResponse],
@@ -279,11 +285,17 @@ async def get_all_risk_scores():
     scores = await country_risk_service.get_all_scores()
     return [
         CountryRiskResponse(
-            iso2=s.iso2, iso3=s.iso3, name=s.name,
-            risk_score=s.risk_score, cyber_score=s.cyber_score,
-            news_score=s.news_score, stability_baseline=s.stability_baseline,
+            iso2=s.iso2,
+            iso3=s.iso3,
+            name=s.name,
+            risk_score=s.risk_score,
+            cyber_score=s.cyber_score,
+            news_score=s.news_score,
+            stability_baseline=s.stability_baseline,
             attack_count_24h=s.attack_count_24h,
-            lat=s.lat, lng=s.lng, last_updated=s.last_updated,
+            lat=s.lat,
+            lng=s.lng,
+            last_updated=s.last_updated,
         )
         for s in scores
     ]
@@ -302,17 +314,24 @@ async def get_country_risk(iso2: str):
     if not score:
         raise HTTPException(status_code=404, detail=f"Country '{iso2}' not found")
     return CountryRiskResponse(
-        iso2=score.iso2, iso3=score.iso3, name=score.name,
-        risk_score=score.risk_score, cyber_score=score.cyber_score,
-        news_score=score.news_score, stability_baseline=score.stability_baseline,
+        iso2=score.iso2,
+        iso3=score.iso3,
+        name=score.name,
+        risk_score=score.risk_score,
+        cyber_score=score.cyber_score,
+        news_score=score.news_score,
+        stability_baseline=score.stability_baseline,
         attack_count_24h=score.attack_count_24h,
-        lat=score.lat, lng=score.lng, last_updated=score.last_updated,
+        lat=score.lat,
+        lng=score.lng,
+        last_updated=score.last_updated,
     )
 
 
 # ---------------------------------------------------------------------------
 # Ollama status
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/ollama/status",
@@ -335,6 +354,7 @@ async def ollama_status():
 )
 async def ollama_reset():
     from app.services.ollama_service import ollama_service
+
     await ollama_service.reset_probe()
     return {"status": "probe reset"}
 
@@ -347,10 +367,14 @@ async def ollama_reset():
 async def ollama_pull(model_name: str):
     """Trigger `ollama pull <model_name>`. Returns immediately; the pull runs asynchronously."""
     from app.services.ollama_service import ollama_service
+
     success = await ollama_service.pull_model(model_name)
     if success:
         await ollama_service.reset_probe()
-    return {"status": "pull_initiated" if success else "pull_failed", "model": model_name}
+    return {
+        "status": "pull_initiated" if success else "pull_failed",
+        "model": model_name,
+    }
 
 
 @router.post(
@@ -361,6 +385,7 @@ async def ollama_pull(model_name: str):
 async def ollama_select_model(model_name: str):
     """Change the active model used for brief generation."""
     from app.services import ollama_service as ollama_module
+
     ollama_module.OLLAMA_MODEL = model_name
     ollama_module.ollama_service._available = None  # reset probe
     return {"status": "model_changed", "model": model_name}
@@ -369,6 +394,7 @@ async def ollama_select_model(model_name: str):
 # ---------------------------------------------------------------------------
 # Country risk trend (sparkline data)
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/risk/{iso2}/trend",
@@ -388,9 +414,7 @@ async def get_country_risk_trend(
 
     from app.models.intelligence import CountryRiskSnapshot
 
-    t_from = datetime.fromtimestamp(
-        _time.time() - hours * 3600, tz=timezone.utc
-    )
+    t_from = datetime.fromtimestamp(_time.time() - hours * 3600, tz=timezone.utc)
 
     try:
         stmt = (
@@ -432,6 +456,7 @@ async def get_country_risk_trend(
 # Sentiment timeline
 # ---------------------------------------------------------------------------
 
+
 class SentimentPoint(BaseModel):
     ts: float
     sentiment: float
@@ -445,7 +470,9 @@ class SentimentPoint(BaseModel):
     summary="Hourly sentiment score timeline for recent news",
 )
 async def get_sentiment_timeline(
-    region: Optional[str] = Query(default=None, description="Filter by region (e.g. 'global', 'europe')"),
+    region: Optional[str] = Query(
+        default=None, description="Filter by region (e.g. 'global', 'europe')"
+    ),
     hours: int = Query(default=24, ge=1, le=168),
     db: AsyncSession = Depends(get_db),
 ) -> List[SentimentPoint]:

@@ -14,6 +14,7 @@ from app.services.country_risk import _BASELINE, CountryRiskService
 # Fixture: fresh service instance per test
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def svc() -> CountryRiskService:
     return CountryRiskService()
@@ -22,6 +23,7 @@ def svc() -> CountryRiskService:
 # ---------------------------------------------------------------------------
 # Initialisation
 # ---------------------------------------------------------------------------
+
 
 def test_init_creates_scores_for_all_baseline_countries(svc):
     assert len(svc._scores) == len(_BASELINE)
@@ -35,6 +37,7 @@ def test_init_scores_have_nonzero_risk(svc):
 # ---------------------------------------------------------------------------
 # start / stop
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_start_creates_background_task(svc):
@@ -62,6 +65,7 @@ async def test_stop_without_start_does_not_raise(svc):
 # get_all_scores
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_get_all_scores_returns_list(svc):
     scores = await svc.get_all_scores()
@@ -79,6 +83,7 @@ async def test_get_all_scores_sorted_descending(svc):
 # ---------------------------------------------------------------------------
 # get_country_score
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_get_country_score_known_country(svc):
@@ -103,6 +108,7 @@ async def test_get_country_score_unknown_returns_none(svc):
 # ---------------------------------------------------------------------------
 # record_attack
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_record_attack_increments_count(svc):
@@ -132,6 +138,7 @@ async def test_record_attack_by_iso2_code(svc):
 # update_news_sentiment
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_update_news_sentiment_sets_value(svc):
     await svc.update_news_sentiment("United States", -0.5)
@@ -155,6 +162,7 @@ async def test_update_news_sentiment_unknown_country(svc):
 # ---------------------------------------------------------------------------
 # _recompute_scores
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_recompute_scores_updates_cyber_score(svc):
@@ -194,6 +202,7 @@ async def test_recompute_scores_risk_capped_at_100(svc):
 # ---------------------------------------------------------------------------
 # _country_to_iso2
 # ---------------------------------------------------------------------------
+
 
 def test_country_to_iso2_exact_name(svc):
     assert svc._country_to_iso2("United States") == "US"

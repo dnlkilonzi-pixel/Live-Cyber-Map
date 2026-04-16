@@ -176,10 +176,10 @@ class OllamaService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _build_prompt(
-        headlines: list[str], context: str, style: str
-    ) -> str:
-        headline_block = "\n".join(f"{i+1}. {h}" for i, h in enumerate(headlines[:15]))
+    def _build_prompt(headlines: list[str], context: str, style: str) -> str:
+        headline_block = "\n".join(
+            f"{i + 1}. {h}" for i, h in enumerate(headlines[:15])
+        )
         return (
             f"You are a {style}. Based on the following recent news headlines about {context}, "
             f"write a concise 3-4 sentence intelligence brief that synthesizes the key themes, "
@@ -197,7 +197,11 @@ class OllamaService:
         return (
             f"Recent {context} developments: "
             + " | ".join(top[:3])
-            + (f" and {len(headlines) - 3} more stories." if len(headlines) > 3 else ".")
+            + (
+                f" and {len(headlines) - 3} more stories."
+                if len(headlines) > 3
+                else "."
+            )
         )
 
     # ------------------------------------------------------------------

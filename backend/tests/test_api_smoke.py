@@ -23,11 +23,14 @@ _SQLITE_URL = "sqlite+aiosqlite:///:memory:"
 async def db_client():
     """HTTPX client wired to the app with get_db overridden to use SQLite."""
     engine = create_async_engine(_SQLITE_URL, echo=False)
-    TestSession = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
+    TestSession = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False, autoflush=False
+    )
 
     # Create tables
     async with engine.begin() as conn:
         from app.models import alert, attack, financial, intelligence  # noqa: F401
+
         await conn.run_sync(Base.metadata.create_all)
 
     async def override_get_db():
@@ -41,7 +44,9 @@ async def db_client():
 
     app.dependency_overrides[get_db] = override_get_db
     try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             yield ac
     finally:
         app.dependency_overrides.pop(get_db, None)
@@ -114,6 +119,7 @@ async def test_attacks_recent_empty_initially(client):
 # PUT /api/alerts/rules/{id} contract tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.anyio
 async def test_put_alert_rule_happy_path(db_client):
     """PUT /api/alerts/rules/{id} — 200 with updated fields returned."""
@@ -153,7 +159,13 @@ async def test_put_alert_rule_partial_update_name_only(db_client):
     # Create rule with threshold and target
     create_resp = await db_client.post(
         "/api/alerts/rules",
-        json={"name": "Threshold Rule", "condition": "risk_above", "target": "RU", "threshold": 70.0, "enabled": True},
+        json={
+            "name": "Threshold Rule",
+            "condition": "risk_above",
+            "target": "RU",
+            "threshold": 70.0,
+            "enabled": True,
+        },
     )
     assert create_resp.status_code == 201
     created = create_resp.json()
@@ -176,6 +188,7 @@ async def test_put_alert_rule_partial_update_name_only(db_client):
 # ---------------------------------------------------------------------------
 # DELETE /api/alerts/rules/{id}
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.anyio
 async def test_delete_alert_rule_happy_path(db_client):
@@ -201,6 +214,7 @@ async def test_delete_alert_rule_not_found(db_client):
 # ---------------------------------------------------------------------------
 # PATCH /api/alerts/rules/{id}/toggle
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.anyio
 async def test_toggle_alert_rule_disables_enabled_rule(db_client):
@@ -239,6 +253,7 @@ async def test_toggle_alert_rule_not_found(db_client):
 # GET /api/alerts/rules
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.anyio
 async def test_list_alert_rules_empty(db_client):
     """GET /api/alerts/rules returns an empty list when no rules exist."""
@@ -264,6 +279,7 @@ async def test_list_alert_rules_returns_created_rules(db_client):
 # ---------------------------------------------------------------------------
 # POST /api/replay/start  and  POST /api/replay/stop
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.anyio
 async def test_replay_start(client):
@@ -296,6 +312,7 @@ async def test_replay_start_default_speed(client):
 # Rate-limit middleware – non-limited path passes through
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.anyio
 async def test_non_rate_limited_path_always_passes(client):
     """/api/health is not in _RATE_LIMIT_PATHS — always returns 200."""
@@ -307,6 +324,7 @@ async def test_non_rate_limited_path_always_passes(client):
 # ---------------------------------------------------------------------------
 # GET /api/health with working DB (covers db_ok=True path in routes.py)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.anyio
 async def test_health_with_db_connected(db_client):
@@ -321,6 +339,7 @@ async def test_health_with_db_connected(db_client):
 # ---------------------------------------------------------------------------
 # GET /api/attacks/history — filter combinations
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.anyio
 async def test_attack_history_empty(db_client):
@@ -371,6 +390,7 @@ async def test_attack_history_with_all_filters(db_client):
 # ---------------------------------------------------------------------------
 # POST /api/replay/seek
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.anyio
 async def test_replay_seek_at_zero(db_client):

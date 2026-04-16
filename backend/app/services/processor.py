@@ -52,9 +52,11 @@ _DB_FLUSH_INTERVAL = 2.0  # seconds
 class AttackProcessor:
     """Reads from the generator queue, enriches events, and fans out to Redis + DB."""
 
-    def __init__(self, queue: asyncio.Queue, redis_client=None, db_session_factory=None) -> None:  # type: ignore[type-arg]
+    def __init__(
+        self, queue: asyncio.Queue, redis_client=None, db_session_factory=None
+    ) -> None:  # type: ignore[type-arg]
         self._queue = queue
-        self._redis = redis_client          # may be None (graceful degradation)
+        self._redis = redis_client  # may be None (graceful degradation)
         self._db_factory = db_session_factory  # may be None
         self._running = False
         self._tasks: List[asyncio.Task] = []  # type: ignore[type-arg]
@@ -92,21 +94,25 @@ class AttackProcessor:
         # Re-enrich source / dest in case geo wasn't set by generator
         if not event.get("source_lat"):
             src_geo = geoip_service.enrich(event["source_ip"])
-            event.update({
-                "source_lat": src_geo["lat"],
-                "source_lng": src_geo["lng"],
-                "source_country": src_geo["country"],
-                "source_country_code": src_geo["country_code"],
-            })
+            event.update(
+                {
+                    "source_lat": src_geo["lat"],
+                    "source_lng": src_geo["lng"],
+                    "source_country": src_geo["country"],
+                    "source_country_code": src_geo["country_code"],
+                }
+            )
 
         if not event.get("dest_lat"):
             dst_geo = geoip_service.enrich(event["dest_ip"])
-            event.update({
-                "dest_lat": dst_geo["lat"],
-                "dest_lng": dst_geo["lng"],
-                "dest_country": dst_geo["country"],
-                "dest_country_code": dst_geo["country_code"],
-            })
+            event.update(
+                {
+                    "dest_lat": dst_geo["lat"],
+                    "dest_lng": dst_geo["lng"],
+                    "dest_country": dst_geo["country"],
+                    "dest_country_code": dst_geo["country_code"],
+                }
+            )
 
         # Recalculate severity with bonus
         base_severity = event.get("severity", 5)
@@ -151,7 +157,7 @@ class AttackProcessor:
                 async with self._history_lock:
                     self._history.append(processed)
                     if len(self._history) > settings.MAX_EVENTS_HISTORY:
-                        self._history = self._history[-settings.MAX_EVENTS_HISTORY:]
+                        self._history = self._history[-settings.MAX_EVENTS_HISTORY :]
 
             except asyncio.TimeoutError:
                 continue
@@ -181,10 +187,12 @@ class AttackProcessor:
             fired_list = await alert_service.check_attack_event(event)
             for alert in fired_list:
                 logger.info("Alert fired: %s", alert.message)
-                await ws_manager.broadcast({
-                    "type": "alert",
-                    "data": alert.model_dump(),
-                })
+                await ws_manager.broadcast(
+                    {
+                        "type": "alert",
+                        "data": alert.model_dump(),
+                    }
+                )
         except Exception as exc:
             logger.debug("Alert check error: %s", exc)
 

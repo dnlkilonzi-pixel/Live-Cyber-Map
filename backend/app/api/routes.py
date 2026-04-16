@@ -29,6 +29,7 @@ _replay_state = {"active": False, "speed": 1.0}
 # Health
 # ---------------------------------------------------------------------------
 
+
 @router.get("/health", tags=["meta"])
 async def health_check(db: AsyncSession = Depends(get_db)):
     """Return service health including DB and Redis reachability."""
@@ -45,6 +46,7 @@ async def health_check(db: AsyncSession = Depends(get_db)):
     # Check Redis
     try:
         from app.main import redis_client  # import here to avoid circular refs
+
         if redis_client is not None:
             await redis_client.ping()
             redis_ok = True
@@ -64,6 +66,7 @@ async def health_check(db: AsyncSession = Depends(get_db)):
 # Stats
 # ---------------------------------------------------------------------------
 
+
 @router.get("/stats", tags=["stats"])
 async def get_stats():
     """Return live event rate statistics and anomaly indicators."""
@@ -79,6 +82,7 @@ async def get_stats():
 # ---------------------------------------------------------------------------
 # Recent attacks (in-memory)
 # ---------------------------------------------------------------------------
+
 
 @router.get("/attacks/recent", tags=["attacks"])
 async def get_recent_attacks(
@@ -98,7 +102,10 @@ async def get_recent_attacks(
 # Historical attacks (database)
 # ---------------------------------------------------------------------------
 
-@router.get("/attacks/history", tags=["attacks"], response_model=List[AttackEventResponse])
+
+@router.get(
+    "/attacks/history", tags=["attacks"], response_model=List[AttackEventResponse]
+)
 async def get_attack_history(
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
@@ -138,6 +145,7 @@ async def get_attack_history(
 # ---------------------------------------------------------------------------
 # Replay endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("/replay", tags=["replay"])
 async def get_replay_status():
@@ -246,7 +254,11 @@ async def get_replay_intelligence(
     from app.models.intelligence import CountryRiskSnapshot
 
     now = _time.time()
-    t_to = datetime.fromtimestamp(to_ts, tz=timezone.utc) if to_ts else datetime.now(timezone.utc)
+    t_to = (
+        datetime.fromtimestamp(to_ts, tz=timezone.utc)
+        if to_ts
+        else datetime.now(timezone.utc)
+    )
     t_from = (
         datetime.fromtimestamp(from_ts, tz=timezone.utc)
         if from_ts
@@ -321,4 +333,3 @@ async def get_replay_intelligence(
     except Exception as exc:
         logger.warning("Replay intelligence query failed: %s", exc)
         raise HTTPException(status_code=503, detail="Database unavailable") from exc
-

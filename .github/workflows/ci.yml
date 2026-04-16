@@ -34,6 +34,9 @@ jobs:
       - name: Lint with ruff
         run: ruff check . --select E,F,W,I --ignore E501
 
+      - name: Format check with ruff
+        run: ruff format --check .
+
       - name: Run tests with coverage
         run: |
           pytest tests/ -v --tb=short --ignore=tests/integration \

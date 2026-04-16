@@ -74,29 +74,39 @@ class AlertService:
                     if rule.target and rule.target != attack_type:
                         continue
                     if self._is_cooled_down(rule.id):
-                        fired.append(AlertFired(
-                            rule_id=rule.id,
-                            rule_name=rule.name,
-                            condition=rule.condition,
-                            message=f"{attack_type} attack detected targeting {dest_country}",
-                            fired_at=time.time(),
-                        ))
-                        self._last_fired[rule.id] = time.time()
-
-                # BBOX (geofence) rule
-                elif rule.condition == "bbox" and dest_lat is not None and dest_lng is not None:
-                    if rule.bbox and self._point_in_bbox(float(dest_lat), float(dest_lng), rule.bbox):
-                        if self._is_cooled_down(rule.id):
-                            fired.append(AlertFired(
+                        fired.append(
+                            AlertFired(
                                 rule_id=rule.id,
                                 rule_name=rule.name,
                                 condition=rule.condition,
-                                message=(
-                                    f"{attack_type} attack targeted {dest_country} "
-                                    f"within geofence ({dest_lat:.2f}, {dest_lng:.2f})"
-                                ),
+                                message=f"{attack_type} attack detected targeting {dest_country}",
                                 fired_at=time.time(),
-                            ))
+                            )
+                        )
+                        self._last_fired[rule.id] = time.time()
+
+                # BBOX (geofence) rule
+                elif (
+                    rule.condition == "bbox"
+                    and dest_lat is not None
+                    and dest_lng is not None
+                ):
+                    if rule.bbox and self._point_in_bbox(
+                        float(dest_lat), float(dest_lng), rule.bbox
+                    ):
+                        if self._is_cooled_down(rule.id):
+                            fired.append(
+                                AlertFired(
+                                    rule_id=rule.id,
+                                    rule_name=rule.name,
+                                    condition=rule.condition,
+                                    message=(
+                                        f"{attack_type} attack targeted {dest_country} "
+                                        f"within geofence ({dest_lat:.2f}, {dest_lng:.2f})"
+                                    ),
+                                    fired_at=time.time(),
+                                )
+                            )
                             self._last_fired[rule.id] = time.time()
 
         return fired
@@ -113,7 +123,9 @@ class AlertService:
         except (ValueError, AttributeError):
             return False
 
-    async def check_country_risk(self, iso2: str, risk_score: float) -> List[AlertFired]:
+    async def check_country_risk(
+        self, iso2: str, risk_score: float
+    ) -> List[AlertFired]:
         """Check RISK_ABOVE rules for a given country."""
         fired: List[AlertFired] = []
         async with self._lock:
@@ -128,17 +140,21 @@ class AlertService:
                     continue
                 if risk_score > rule.threshold:
                     if self._is_cooled_down(rule.id):
-                        fired.append(AlertFired(
-                            rule_id=rule.id,
-                            rule_name=rule.name,
-                            condition=rule.condition,
-                            message=f"Risk score for {iso2} is {risk_score:.0f} (threshold: {rule.threshold:.0f})",
-                            fired_at=time.time(),
-                        ))
+                        fired.append(
+                            AlertFired(
+                                rule_id=rule.id,
+                                rule_name=rule.name,
+                                condition=rule.condition,
+                                message=f"Risk score for {iso2} is {risk_score:.0f} (threshold: {rule.threshold:.0f})",
+                                fired_at=time.time(),
+                            )
+                        )
                         self._last_fired[rule.id] = time.time()
         return fired
 
-    async def check_attack(self, attack_type: str, dest_country: str) -> List[AlertFired]:
+    async def check_attack(
+        self, attack_type: str, dest_country: str
+    ) -> List[AlertFired]:
         """Check ATTACK_TYPE rules."""
         fired: List[AlertFired] = []
         async with self._lock:
@@ -150,17 +166,21 @@ class AlertService:
                 if rule.target and rule.target != attack_type:
                     continue
                 if self._is_cooled_down(rule.id):
-                    fired.append(AlertFired(
-                        rule_id=rule.id,
-                        rule_name=rule.name,
-                        condition=rule.condition,
-                        message=f"{attack_type} attack detected targeting {dest_country}",
-                        fired_at=time.time(),
-                    ))
+                    fired.append(
+                        AlertFired(
+                            rule_id=rule.id,
+                            rule_name=rule.name,
+                            condition=rule.condition,
+                            message=f"{attack_type} attack detected targeting {dest_country}",
+                            fired_at=time.time(),
+                        )
+                    )
                     self._last_fired[rule.id] = time.time()
         return fired
 
-    async def check_price_change(self, symbol: str, change_pct: float) -> List[AlertFired]:
+    async def check_price_change(
+        self, symbol: str, change_pct: float
+    ) -> List[AlertFired]:
         """Check PRICE_CHANGE rules."""
         fired: List[AlertFired] = []
         async with self._lock:
@@ -176,13 +196,15 @@ class AlertService:
                 if abs(change_pct) > abs(rule.threshold):
                     direction = "up" if change_pct > 0 else "down"
                     if self._is_cooled_down(rule.id):
-                        fired.append(AlertFired(
-                            rule_id=rule.id,
-                            rule_name=rule.name,
-                            condition=rule.condition,
-                            message=f"{symbol} moved {direction} {abs(change_pct):.2f}% (threshold: {abs(rule.threshold):.1f}%)",
-                            fired_at=time.time(),
-                        ))
+                        fired.append(
+                            AlertFired(
+                                rule_id=rule.id,
+                                rule_name=rule.name,
+                                condition=rule.condition,
+                                message=f"{symbol} moved {direction} {abs(change_pct):.2f}% (threshold: {abs(rule.threshold):.1f}%)",
+                                fired_at=time.time(),
+                            )
+                        )
                         self._last_fired[rule.id] = time.time()
         return fired
 
@@ -199,13 +221,15 @@ class AlertService:
                     continue
                 if score > rule.threshold:
                     if self._is_cooled_down(rule.id):
-                        fired.append(AlertFired(
-                            rule_id=rule.id,
-                            rule_name=rule.name,
-                            condition=rule.condition,
-                            message=f"Anomaly score {score:.2f} exceeded threshold {rule.threshold:.2f}",
-                            fired_at=time.time(),
-                        ))
+                        fired.append(
+                            AlertFired(
+                                rule_id=rule.id,
+                                rule_name=rule.name,
+                                condition=rule.condition,
+                                message=f"Anomaly score {score:.2f} exceeded threshold {rule.threshold:.2f}",
+                                fired_at=time.time(),
+                            )
+                        )
                         self._last_fired[rule.id] = time.time()
         return fired
 
@@ -238,20 +262,24 @@ class AlertService:
             fired_list = await self.check_country_risk(score.iso2, score.risk_score)
             for alert in fired_list:
                 logger.info("Alert fired: %s", alert.message)
-                await ws_manager.broadcast({
-                    "type": "alert",
-                    "data": alert.model_dump(),
-                })
+                await ws_manager.broadcast(
+                    {
+                        "type": "alert",
+                        "data": alert.model_dump(),
+                    }
+                )
 
         # Check anomaly score rules
         stats = anomaly_detector.get_stats()
         anomaly_fired = await self.check_anomaly_score(stats.get("anomaly_score", 0.0))
         for alert in anomaly_fired:
             logger.info("Anomaly alert fired: %s", alert.message)
-            await ws_manager.broadcast({
-                "type": "alert",
-                "data": alert.model_dump(),
-            })
+            await ws_manager.broadcast(
+                {
+                    "type": "alert",
+                    "data": alert.model_dump(),
+                }
+            )
 
 
 # Module-level singleton

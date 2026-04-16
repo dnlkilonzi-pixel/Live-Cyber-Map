@@ -16,6 +16,7 @@ from app.services.generator import AttackGenerator
 # _generate_severity – static method, no I/O needed
 # ---------------------------------------------------------------------------
 
+
 class TestGenerateSeverity:
     """Verify the severity distribution for each attack-type category."""
 
@@ -23,7 +24,9 @@ class TestGenerateSeverity:
     LOW_TYPES = ("XSS", "Phishing", "BruteForce")
     MED_TYPES = ("DDoS", "Malware", "SQLInjection")
 
-    def _check_range(self, attack_type: str, lo: int, hi: int, trials: int = 30) -> None:
+    def _check_range(
+        self, attack_type: str, lo: int, hi: int, trials: int = 30
+    ) -> None:
         for _ in range(trials):
             s = AttackGenerator._generate_severity(attack_type)
             assert lo <= s <= hi, f"{attack_type}: severity {s} outside [{lo}, {hi}]"
@@ -52,6 +55,7 @@ class TestGenerateSeverity:
 # ---------------------------------------------------------------------------
 # generate_event – field shape and value constraints
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_generate_event_returns_required_fields():
@@ -98,8 +102,15 @@ async def test_generate_event_cluster_id_is_none():
 @pytest.mark.asyncio
 async def test_generate_event_attack_type_valid():
     valid_types = {
-        "DDoS", "BruteForce", "Malware", "Phishing",
-        "SQLInjection", "Intrusion", "XSS", "Ransomware", "ZeroDay",
+        "DDoS",
+        "BruteForce",
+        "Malware",
+        "Phishing",
+        "SQLInjection",
+        "Intrusion",
+        "XSS",
+        "Ransomware",
+        "ZeroDay",
     }
     queue: asyncio.Queue = asyncio.Queue()
     gen = AttackGenerator(queue)
@@ -120,6 +131,7 @@ async def test_generate_event_ip_not_empty():
 @pytest.mark.asyncio
 async def test_generate_event_id_is_uuid_string():
     import re
+
     uuid_re = re.compile(
         r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
     )
@@ -132,6 +144,7 @@ async def test_generate_event_id_is_uuid_string():
 # ---------------------------------------------------------------------------
 # start / stop lifecycle
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_start_sets_running_true():

@@ -22,6 +22,7 @@ from app.services.ollama_service import OllamaService
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _service(available: bool | None = None) -> OllamaService:
     svc = OllamaService()
     svc._available = available
@@ -44,15 +45,20 @@ def _mock_response(status: int, body: dict | None = None) -> MagicMock:
 # _probe
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_probe_returns_true_on_200():
     svc = OllamaService()
     mock_client = AsyncMock()
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    mock_client.get = AsyncMock(return_value=_mock_response(200, {"models": [{"name": "llama3.2:3b"}]}))
+    mock_client.get = AsyncMock(
+        return_value=_mock_response(200, {"models": [{"name": "llama3.2:3b"}]})
+    )
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         result = await svc._probe()
 
     assert result is True
@@ -66,7 +72,9 @@ async def test_probe_returns_false_on_non_200():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(return_value=_mock_response(503))
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         result = await svc._probe()
 
     assert result is False
@@ -80,7 +88,9 @@ async def test_probe_returns_false_on_network_error():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         result = await svc._probe()
 
     assert result is False
@@ -89,6 +99,7 @@ async def test_probe_returns_false_on_network_error():
 # ---------------------------------------------------------------------------
 # is_available – caching
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_is_available_returns_cached_true():
@@ -117,6 +128,7 @@ async def test_is_available_calls_probe_when_none():
 # reset_probe
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_reset_probe_clears_cache():
     svc = _service(available=True)
@@ -128,6 +140,7 @@ async def test_reset_probe_clears_cache():
 # _fallback_brief
 # ---------------------------------------------------------------------------
 
+
 def test_fallback_brief_no_headlines():
     result = OllamaService._fallback_brief([], "geopolitics")
     assert "geopolitics" in result
@@ -135,7 +148,13 @@ def test_fallback_brief_no_headlines():
 
 
 def test_fallback_brief_with_headlines():
-    headlines = ["War in X", "Crisis in Y", "Elections in Z", "Deal reached", "Market crash"]
+    headlines = [
+        "War in X",
+        "Crisis in Y",
+        "Elections in Z",
+        "Deal reached",
+        "Market crash",
+    ]
     result = OllamaService._fallback_brief(headlines, "world")
     assert "world" in result
     assert "War in X" in result
@@ -150,6 +169,7 @@ def test_fallback_brief_single_headline():
 # ---------------------------------------------------------------------------
 # _build_prompt
 # ---------------------------------------------------------------------------
+
 
 def test_build_prompt_contains_context():
     prompt = OllamaService._build_prompt(["h1", "h2"], "cybersecurity", "analyst")
@@ -171,6 +191,7 @@ def test_build_prompt_limits_to_15_headlines():
 # generate_brief – unavailable
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_generate_brief_falls_back_when_unavailable():
     svc = _service(available=False)
@@ -183,6 +204,7 @@ async def test_generate_brief_falls_back_when_unavailable():
 # generate_brief – available, successful HTTP call
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_generate_brief_returns_ollama_response():
     svc = _service(available=True)
@@ -192,7 +214,9 @@ async def test_generate_brief_returns_ollama_response():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(return_value=mock_resp)
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         result = await svc.generate_brief(["h1", "h2"])
 
     assert result == "Synthesized brief text."
@@ -206,7 +230,9 @@ async def test_generate_brief_falls_back_on_http_error():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(side_effect=httpx.ConnectError("timeout"))
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         result = await svc.generate_brief(["h1", "h2"])
 
     assert isinstance(result, str)
@@ -222,7 +248,9 @@ async def test_generate_brief_falls_back_on_empty_response():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(return_value=mock_resp)
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         result = await svc.generate_brief(["h1", "h2"], context="security")
 
     # Empty response → fallback
@@ -233,6 +261,7 @@ async def test_generate_brief_falls_back_on_empty_response():
 # ---------------------------------------------------------------------------
 # analyze_risk
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_analyze_risk_unavailable():
@@ -251,7 +280,9 @@ async def test_analyze_risk_available_success():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(return_value=mock_resp)
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         result = await svc.analyze_risk("Germany", ["Event A"])
 
     assert result == "Germany is stable."
@@ -265,7 +296,9 @@ async def test_analyze_risk_available_exception():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(side_effect=Exception("timeout"))
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         result = await svc.analyze_risk("France", ["e1"])
 
     assert "France" in result
@@ -274,6 +307,7 @@ async def test_analyze_risk_available_exception():
 # ---------------------------------------------------------------------------
 # summarize_article
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_summarize_article_unavailable_short_content():
@@ -300,7 +334,9 @@ async def test_summarize_article_available_success():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(return_value=mock_resp)
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         result = await svc.summarize_article("T", "content")
 
     assert result == "One-sentence summary."
@@ -314,7 +350,9 @@ async def test_summarize_article_available_exception():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(side_effect=Exception("error"))
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         result = await svc.summarize_article("T", "fallback content")
 
     assert "fallback content" in result
@@ -324,16 +362,21 @@ async def test_summarize_article_available_exception():
 # list_models
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_list_models_returns_models():
     svc = OllamaService()
-    mock_resp = _mock_response(200, {"models": [{"name": "llama3.2:3b"}, {"name": "mistral"}]})
+    mock_resp = _mock_response(
+        200, {"models": [{"name": "llama3.2:3b"}, {"name": "mistral"}]}
+    )
     mock_client = AsyncMock()
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(return_value=mock_resp)
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         models = await svc.list_models()
 
     assert len(models) == 2
@@ -348,7 +391,9 @@ async def test_list_models_returns_empty_on_error():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(side_effect=Exception("offline"))
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         models = await svc.list_models()
 
     assert models == []
@@ -357,6 +402,7 @@ async def test_list_models_returns_empty_on_error():
 # ---------------------------------------------------------------------------
 # pull_model
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_pull_model_returns_true_on_200():
@@ -367,7 +413,9 @@ async def test_pull_model_returns_true_on_200():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(return_value=mock_resp)
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         result = await svc.pull_model("llama3.2:3b")
 
     assert result is True
@@ -381,7 +429,9 @@ async def test_pull_model_returns_false_on_error():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(side_effect=Exception("timeout"))
 
-    with patch("app.services.ollama_service.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "app.services.ollama_service.httpx.AsyncClient", return_value=mock_client
+    ):
         result = await svc.pull_model("unknown_model")
 
     assert result is False

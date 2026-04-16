@@ -51,9 +51,7 @@ async def websocket_endpoint(websocket: WebSocket):
         from app.main import redis_client  # noqa: PLC0415
 
         if redis_client is not None:
-            sub_task = asyncio.create_task(
-                _redis_forwarder(websocket, redis_client)
-            )
+            sub_task = asyncio.create_task(_redis_forwarder(websocket, redis_client))
 
         # ------------------------------------------------------------------ #
         # 3. Command loop — handle messages from the client
@@ -87,12 +85,15 @@ async def websocket_endpoint(websocket: WebSocket):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 async def _send_initial_history(websocket: WebSocket) -> None:
     """Push recent events and current stats to a newly connected client."""
     try:
         from app.main import processor  # noqa: PLC0415
 
-        events = processor.get_recent_events(_INITIAL_HISTORY_COUNT) if processor else []
+        events = (
+            processor.get_recent_events(_INITIAL_HISTORY_COUNT) if processor else []
+        )
         stats = anomaly_detector.get_stats()
 
         await websocket.send_text(
@@ -138,7 +139,9 @@ async def _handle_command(websocket: WebSocket, raw: str) -> None:
     try:
         msg = json.loads(raw)
     except json.JSONDecodeError:
-        await websocket.send_text(json.dumps({"type": "error", "detail": "Invalid JSON"}))
+        await websocket.send_text(
+            json.dumps({"type": "error", "detail": "Invalid JSON"})
+        )
         return
 
     command = msg.get("command", "")
@@ -157,7 +160,9 @@ async def _handle_command(websocket: WebSocket, raw: str) -> None:
 
     elif command == "replay":
         await websocket.send_text(
-            json.dumps({"type": "ack", "command": "replay", "status": "not_implemented"})
+            json.dumps(
+                {"type": "ack", "command": "replay", "status": "not_implemented"}
+            )
         )
 
     elif command == "stats":

@@ -25,6 +25,7 @@ from app.websocket.handler import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_ws() -> AsyncMock:
     ws = AsyncMock()
     ws.send_text = AsyncMock()
@@ -40,6 +41,7 @@ def _sent_json(ws: AsyncMock, call_index: int = 0) -> dict:
 # ---------------------------------------------------------------------------
 # _handle_command – valid commands
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_handle_pause():
@@ -126,6 +128,7 @@ async def test_handle_empty_command():
 # _handle_command – invalid JSON
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_handle_invalid_json():
     ws = _make_ws()
@@ -138,6 +141,7 @@ async def test_handle_invalid_json():
 # ---------------------------------------------------------------------------
 # _send_initial_history
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_send_initial_history_with_processor():
@@ -156,6 +160,7 @@ async def test_send_initial_history_with_processor():
         # Patch the lazy import inside the function
         with patch.dict("sys.modules", {}):
             import sys
+
             # Inject a fake app.main module with our mock processor
             fake_main = MagicMock()
             fake_main.processor = mock_processor
@@ -184,6 +189,7 @@ async def test_send_initial_history_no_processor():
         with patch("app.websocket.handler.ws_manager") as mock_mgr:
             mock_mgr.get_connection_count.return_value = 0
             import sys
+
             fake_main = MagicMock()
             fake_main.processor = None
             old_main = sys.modules.get("app.main")
@@ -211,6 +217,7 @@ async def test_send_initial_history_exception_is_swallowed():
         with patch("app.websocket.handler.ws_manager") as mock_mgr:
             mock_mgr.get_connection_count.return_value = 0
             import sys
+
             fake_main = MagicMock()
             fake_main.processor = None
             old_main = sys.modules.get("app.main")
@@ -227,6 +234,7 @@ async def test_send_initial_history_exception_is_swallowed():
 # ---------------------------------------------------------------------------
 # _redis_forwarder
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_redis_forwarder_cancelled():

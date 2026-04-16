@@ -21,6 +21,7 @@ def svc() -> GeoIPService:
 # enrich
 # ---------------------------------------------------------------------------
 
+
 def test_enrich_known_prefix_returns_correct_country(svc):
     # 8.8.x.x is a US prefix
     result = svc.enrich("8.8.8.8")
@@ -55,6 +56,7 @@ def test_enrich_china_prefix(svc):
 # get_random_ip_for_country
 # ---------------------------------------------------------------------------
 
+
 def test_get_random_ip_for_known_country_is_valid_ipv4(svc):
     ip = svc.get_random_ip_for_country("RU")
     parts = ip.split(".")
@@ -81,6 +83,7 @@ def test_get_random_ip_for_north_korea(svc):
 # get_random_country
 # ---------------------------------------------------------------------------
 
+
 def test_get_random_country_has_required_keys(svc):
     country = svc.get_random_country()
     for key in ("name", "lat", "lng", "country_code"):
@@ -99,6 +102,7 @@ def test_get_random_country_returns_copy(svc):
 # get_random_ip
 # ---------------------------------------------------------------------------
 
+
 def test_get_random_ip_is_valid_ipv4(svc):
     ip = svc.get_random_ip()
     parts = ip.split(".")
@@ -110,6 +114,7 @@ def test_get_random_ip_is_valid_ipv4(svc):
 # ---------------------------------------------------------------------------
 # get_country_info
 # ---------------------------------------------------------------------------
+
 
 def test_get_country_info_known(svc):
     info = svc.get_country_info("DE")
@@ -124,6 +129,7 @@ def test_get_country_info_unknown_returns_none(svc):
 # ---------------------------------------------------------------------------
 # _resolve_country_code
 # ---------------------------------------------------------------------------
+
 
 def test_resolve_by_two_octet_prefix(svc):
     # 1.180 maps to CN in the prefix table
@@ -145,6 +151,7 @@ def test_resolve_unknown_falls_back_to_us(svc):
 # ---------------------------------------------------------------------------
 # _complete_ip
 # ---------------------------------------------------------------------------
+
 
 def test_complete_ip_single_octet_prefix():
     ip = GeoIPService._complete_ip("10")
@@ -169,6 +176,7 @@ def test_complete_ip_already_full():
 # ---------------------------------------------------------------------------
 # _is_valid_ip
 # ---------------------------------------------------------------------------
+
 
 def test_is_valid_ip_typical_addresses():
     assert GeoIPService._is_valid_ip("192.168.1.1") is True

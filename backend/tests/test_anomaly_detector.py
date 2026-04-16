@@ -14,6 +14,7 @@ from app.services.anomaly_detector import _WINDOW_SECONDS, AnomalyDetector
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _event(
     src_ip: str = "1.1.1.1",
     src_country: str = "CN",
@@ -31,6 +32,7 @@ def _event(
 # ---------------------------------------------------------------------------
 # Initial state
 # ---------------------------------------------------------------------------
+
 
 def test_initial_stats_are_zero():
     d = AnomalyDetector()
@@ -61,6 +63,7 @@ def test_initial_attack_type_stats_empty():
 # add_event – window accounting
 # ---------------------------------------------------------------------------
 
+
 def test_add_event_appears_in_window():
     d = AnomalyDetector()
     d.add_event(_event())
@@ -85,6 +88,7 @@ def test_events_outside_window_are_evicted():
 # ---------------------------------------------------------------------------
 # add_event – counters
 # ---------------------------------------------------------------------------
+
 
 def test_attacker_counter_increments():
     d = AnomalyDetector()
@@ -138,6 +142,7 @@ def test_attack_type_stats():
 # add_event – per-second bucketing
 # ---------------------------------------------------------------------------
 
+
 def test_per_second_bucket_flush_on_new_second():
     d = AnomalyDetector()
     d.add_event(_event())
@@ -161,6 +166,7 @@ def test_gap_seconds_filled_with_zeros():
 # ---------------------------------------------------------------------------
 # get_stats – derived fields
 # ---------------------------------------------------------------------------
+
 
 def test_events_per_second_nonzero():
     d = AnomalyDetector()
@@ -196,6 +202,7 @@ def test_stats_keys_present():
 # ---------------------------------------------------------------------------
 # get_top_attackers / get_top_targets — limit respected
 # ---------------------------------------------------------------------------
+
 
 def test_top_attackers_limit():
     d = AnomalyDetector()

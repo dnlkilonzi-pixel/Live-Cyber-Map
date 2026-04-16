@@ -23,6 +23,7 @@ from app.services.websocket_manager import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_ws(ip: str = "127.0.0.1") -> MagicMock:
     """Return a minimal AsyncMock that duck-types a FastAPI WebSocket."""
     ws = AsyncMock()
@@ -36,6 +37,7 @@ def _make_ws(ip: str = "127.0.0.1") -> MagicMock:
 # ---------------------------------------------------------------------------
 # connect – happy path
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_connect_accepts_connection():
@@ -71,6 +73,7 @@ async def test_connect_records_timestamp():
 # connect – connection-count limit
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_connect_rejects_when_too_many_connections():
     mgr = WebSocketManager()
@@ -87,6 +90,7 @@ async def test_connect_rejects_when_too_many_connections():
 # ---------------------------------------------------------------------------
 # connect – rate limit
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_connect_rejects_when_rate_limited():
@@ -116,6 +120,7 @@ async def test_connect_allows_after_window_expires():
 # ---------------------------------------------------------------------------
 # disconnect
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_disconnect_removes_from_active():
@@ -176,6 +181,7 @@ async def test_disconnect_ip_count_never_goes_negative():
 # broadcast
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_broadcast_empty_active_returns_early():
     mgr = WebSocketManager()
@@ -219,6 +225,7 @@ async def test_broadcast_prunes_dead_clients():
 # Channel subscriptions
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_subscribe_and_broadcast_to_channel():
     mgr = WebSocketManager()
@@ -258,6 +265,7 @@ async def test_broadcast_to_channel_prunes_dead():
 # Stats
 # ---------------------------------------------------------------------------
 
+
 def test_get_connection_count_zero_initially():
     mgr = WebSocketManager()
     assert mgr.get_connection_count() == 0
@@ -273,6 +281,7 @@ def test_get_connection_count_increments():
 # ---------------------------------------------------------------------------
 # Redis helpers
 # ---------------------------------------------------------------------------
+
 
 def test_set_redis_stores_client():
     mgr = WebSocketManager()
@@ -297,6 +306,7 @@ async def test_stop_redis_subscriber_no_task_does_not_raise():
 # ---------------------------------------------------------------------------
 # _get_ip static method
 # ---------------------------------------------------------------------------
+
 
 def test_get_ip_prefers_forwarded_for_header():
     ws = MagicMock()

@@ -66,6 +66,7 @@ _rl_counts: dict = defaultdict(list)  # ip -> list[float] of request timestamps
 # Lifespan
 # ---------------------------------------------------------------------------
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application startup and shutdown."""
@@ -132,12 +133,17 @@ async def lifespan(app: FastAPI):
             from sqlalchemy import select
 
             from app.models.alert import AlertRule
-            result = await session.execute(select(AlertRule).where(AlertRule.enabled.is_(True)))
+
+            result = await session.execute(
+                select(AlertRule).where(AlertRule.enabled.is_(True))
+            )
             rules = list(result.scalars().all())
             await alert_service.reload_rules(rules)
         await alert_service.start()
     except Exception as exc:
-        logger.warning("Alert service startup error (continuing without alerts): %s", exc)
+        logger.warning(
+            "Alert service startup error (continuing without alerts): %s", exc
+        )
 
     logger.info("Global Intelligence Dashboard backend started.")
     yield
@@ -178,6 +184,7 @@ async def lifespan(app: FastAPI):
 # Application factory
 # ---------------------------------------------------------------------------
 
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
@@ -209,7 +216,7 @@ def create_app() -> FastAPI:
         req_id = request.headers.get("x-request-id") or str(uuid.uuid4())
         start = _rl_time.perf_counter()
         response = await call_next(request)
-        elapsed_ms = ((_rl_time.perf_counter() - start) * 1000)
+        elapsed_ms = (_rl_time.perf_counter() - start) * 1000
         response.headers["x-request-id"] = req_id
         logger.info(
             "%s %s %s %.1fms req_id=%s",
@@ -226,9 +233,9 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def rate_limit_middleware(request: Request, call_next):
         if request.url.path in _RATE_LIMIT_PATHS:
-            ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or (
-                request.client.host if request.client else "unknown"
-            )
+            ip = (request.headers.get("x-forwarded-for") or "").split(",")[
+                0
+            ].strip() or (request.client.host if request.client else "unknown")
             now = _rl_time.time()
             window_start = now - _RATE_WINDOW
             _rl_counts[ip] = [t for t in _rl_counts[ip] if t > window_start]
@@ -257,6 +264,7 @@ def create_app() -> FastAPI:
 
     # WebSocket handler
     from app.websocket.handler import router as ws_router
+
     app.include_router(ws_router)
 
     return app
@@ -268,6 +276,7 @@ app = create_app()
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 async def _anomaly_feed_loop() -> None:
     """Periodically snapshot processor history and feed new events to the

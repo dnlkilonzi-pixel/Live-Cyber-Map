@@ -30,6 +30,7 @@ from app.services.websocket_manager import ws_manager
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_attack(attack_type: str = "DDoS") -> dict:
     return {
         "id": "test-id-1",
@@ -60,6 +61,7 @@ def _make_rule(condition: str = "attack_type", target: str = "DDoS") -> AlertRul
 # ---------------------------------------------------------------------------
 # Test: alert_service.check_attack_event fires for matching attack type
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_alert_fires_on_matching_attack_type():
@@ -124,6 +126,7 @@ async def test_alert_respects_cooldown():
 # Test: bbox geofence evaluation
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_bbox_alert_fires_when_point_inside():
     rule = _make_rule(condition="bbox", target="")
@@ -154,12 +157,14 @@ async def test_bbox_alert_does_not_fire_when_point_outside():
 # Test: WebSocket broadcast of alert
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_ws_receives_alert_broadcast():
     """ws_manager.broadcast({type:'alert',...}) must reach all connected clients."""
     received: list = []
 
     mock_ws = AsyncMock()
+
     # Simulate send_text capturing the payload
     async def capture_send(text):
         received.append(json.loads(text))
@@ -180,7 +185,9 @@ async def test_ws_receives_alert_broadcast():
             message="DDoS attack detected",
             fired_at=time.time(),
         )
-        await ws_manager.broadcast({"type": "alert", "data": alert_payload.model_dump()})
+        await ws_manager.broadcast(
+            {"type": "alert", "data": alert_payload.model_dump()}
+        )
 
         assert len(received) == 1
         assert received[0]["type"] == "alert"
@@ -193,9 +200,12 @@ async def test_ws_receives_alert_broadcast():
 # Test: REST API smoke (health endpoint responds 200)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_health_endpoint():
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         resp = await client.get("/api/health")
     assert resp.status_code == 200
     body = resp.json()
@@ -205,6 +215,7 @@ async def test_health_endpoint():
 # ---------------------------------------------------------------------------
 # Test: Rate limiting returns 429 after exceeding limit
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_rate_limit_returns_429():

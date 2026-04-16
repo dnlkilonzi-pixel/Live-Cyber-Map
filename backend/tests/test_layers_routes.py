@@ -40,15 +40,19 @@ from app.api.layers_routes import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest_asyncio.fixture
 async def client():
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         yield ac
 
 
 # ---------------------------------------------------------------------------
 # GET /api/layers – list all layers
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_list_layers_returns_all(client):
@@ -86,6 +90,7 @@ async def test_list_layers_filter_unknown_category_returns_empty(client):
 # GET /api/layers/categories
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_list_categories(client):
     resp = await client.get("/api/layers/categories")
@@ -103,6 +108,7 @@ async def test_list_categories(client):
 # GET /api/layers/{layer_id} – unknown layer
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_get_layer_unknown_returns_404(client):
     resp = await client.get("/api/layers/totally_fake_layer_xyz")
@@ -112,6 +118,7 @@ async def test_get_layer_unknown_returns_404(client):
 # ---------------------------------------------------------------------------
 # GET /api/layers/{layer_id} – static layers (no external HTTP)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_get_layer_conflict_zones(client):
@@ -198,6 +205,7 @@ async def test_get_layer_limit_param(client):
 # Static data generators (direct function calls, faster than HTTP)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_conflict_zones_data_returns_features():
     features = await _conflict_zones_data(100)
@@ -275,6 +283,7 @@ async def test_country_risk_data_returns_features():
 async def test_cyber_attacks_data_no_processor():
     """With no processor loaded, should return empty list without error."""
     import sys
+
     fake_main = MagicMock()
     fake_main.processor = None
     old_main = sys.modules.get("app.main")
@@ -293,6 +302,7 @@ async def test_cyber_attacks_data_no_processor():
 # _generate_layer_data – fallback to _random_points for unmapped layers
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_generate_layer_data_unmapped_returns_random_points():
     # Use a layer id that exists in LAYER_REGISTRY but has no specific generator
@@ -305,6 +315,7 @@ async def test_generate_layer_data_unmapped_returns_random_points():
 # ---------------------------------------------------------------------------
 # _random_points
 # ---------------------------------------------------------------------------
+
 
 def test_random_points_count():
     pts = _random_points("test_layer", 10)
@@ -345,6 +356,7 @@ def test_random_points_zero_count():
 # ---------------------------------------------------------------------------
 # _wmo_icon
 # ---------------------------------------------------------------------------
+
 
 def test_wmo_icon_clear():
     assert _wmo_icon(0) == "☀️"

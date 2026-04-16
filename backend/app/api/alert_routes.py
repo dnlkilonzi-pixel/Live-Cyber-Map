@@ -24,6 +24,7 @@ router = APIRouter()
 
 class AlertRuleUpdate(BaseModel):
     """Partial update payload for PUT /rules/{id}."""
+
     name: Optional[str] = None
     enabled: Optional[bool] = None
     threshold: Optional[float] = None
@@ -88,7 +89,9 @@ async def delete_rule(rule_id: int, db: AsyncSession = Depends(get_db)):
     tags=["alerts"],
     summary="Update an alert rule in-place (rename, enable/disable, change threshold/bbox)",
 )
-async def update_rule(rule_id: int, body: AlertRuleUpdate, db: AsyncSession = Depends(get_db)):
+async def update_rule(
+    rule_id: int, body: AlertRuleUpdate, db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(select(AlertRule).where(AlertRule.id == rule_id))
     rule = result.scalar_one_or_none()
     if rule is None:
@@ -130,6 +133,7 @@ async def _sync_alert_service(db: AsyncSession) -> None:
     """Reload in-memory rule cache after any mutation."""
     try:
         from app.services.alert_service import alert_service
+
         result = await db.execute(select(AlertRule).where(AlertRule.enabled.is_(True)))
         rules = list(result.scalars().all())
         await alert_service.reload_rules(rules)

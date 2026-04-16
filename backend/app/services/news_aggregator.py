@@ -24,73 +24,255 @@ logger = logging.getLogger(__name__)
 
 RSS_FEEDS: Dict[str, List[Dict[str, str]]] = {
     "world": [
-        {"name": "BBC World", "url": "https://feeds.bbci.co.uk/news/world/rss.xml", "region": "global"},
-        {"name": "Reuters World", "url": "https://feeds.reuters.com/reuters/worldNews", "region": "global"},
-        {"name": "Al Jazeera", "url": "https://www.aljazeera.com/xml/rss/all.xml", "region": "global"},
-        {"name": "AP News", "url": "https://feeds.apnews.com/apnews/world", "region": "global"},
-        {"name": "Guardian World", "url": "https://www.theguardian.com/world/rss", "region": "global"},
-        {"name": "DW World", "url": "https://rss.dw.com/rdf/rss-en-all", "region": "europe"},
-        {"name": "France24", "url": "https://www.france24.com/en/rss", "region": "europe"},
-        {"name": "NHK World", "url": "https://www3.nhk.or.jp/rss/news/cat0.xml", "region": "asia"},
+        {
+            "name": "BBC World",
+            "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+            "region": "global",
+        },
+        {
+            "name": "Reuters World",
+            "url": "https://feeds.reuters.com/reuters/worldNews",
+            "region": "global",
+        },
+        {
+            "name": "Al Jazeera",
+            "url": "https://www.aljazeera.com/xml/rss/all.xml",
+            "region": "global",
+        },
+        {
+            "name": "AP News",
+            "url": "https://feeds.apnews.com/apnews/world",
+            "region": "global",
+        },
+        {
+            "name": "Guardian World",
+            "url": "https://www.theguardian.com/world/rss",
+            "region": "global",
+        },
+        {
+            "name": "DW World",
+            "url": "https://rss.dw.com/rdf/rss-en-all",
+            "region": "europe",
+        },
+        {
+            "name": "France24",
+            "url": "https://www.france24.com/en/rss",
+            "region": "europe",
+        },
+        {
+            "name": "NHK World",
+            "url": "https://www3.nhk.or.jp/rss/news/cat0.xml",
+            "region": "asia",
+        },
     ],
     "technology": [
-        {"name": "TechCrunch", "url": "https://techcrunch.com/feed/", "region": "global"},
+        {
+            "name": "TechCrunch",
+            "url": "https://techcrunch.com/feed/",
+            "region": "global",
+        },
         {"name": "Wired", "url": "https://www.wired.com/feed/rss", "region": "global"},
-        {"name": "Ars Technica", "url": "https://feeds.arstechnica.com/arstechnica/index", "region": "global"},
-        {"name": "The Verge", "url": "https://www.theverge.com/rss/index.xml", "region": "global"},
-        {"name": "Hacker News", "url": "https://hnrss.org/frontpage", "region": "global"},
-        {"name": "MIT Tech Review", "url": "https://www.technologyreview.com/topnews.rss", "region": "global"},
-        {"name": "VentureBeat", "url": "https://venturebeat.com/feed/", "region": "global"},
-        {"name": "ZDNet", "url": "https://www.zdnet.com/news/rss.xml", "region": "global"},
+        {
+            "name": "Ars Technica",
+            "url": "https://feeds.arstechnica.com/arstechnica/index",
+            "region": "global",
+        },
+        {
+            "name": "The Verge",
+            "url": "https://www.theverge.com/rss/index.xml",
+            "region": "global",
+        },
+        {
+            "name": "Hacker News",
+            "url": "https://hnrss.org/frontpage",
+            "region": "global",
+        },
+        {
+            "name": "MIT Tech Review",
+            "url": "https://www.technologyreview.com/topnews.rss",
+            "region": "global",
+        },
+        {
+            "name": "VentureBeat",
+            "url": "https://venturebeat.com/feed/",
+            "region": "global",
+        },
+        {
+            "name": "ZDNet",
+            "url": "https://www.zdnet.com/news/rss.xml",
+            "region": "global",
+        },
     ],
     "finance": [
-        {"name": "Financial Times", "url": "https://www.ft.com/rss/home/uk", "region": "global"},
-        {"name": "Bloomberg Markets", "url": "https://feeds.bloomberg.com/markets/news.rss", "region": "global"},
-        {"name": "CNBC Finance", "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664", "region": "global"},
-        {"name": "Wall Street Journal", "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml", "region": "global"},
-        {"name": "Reuters Business", "url": "https://feeds.reuters.com/reuters/businessNews", "region": "global"},
-        {"name": "MarketWatch", "url": "https://feeds.marketwatch.com/marketwatch/realtimeheadlines/", "region": "global"},
-        {"name": "Forbes Finance", "url": "https://www.forbes.com/investing/feed2/", "region": "global"},
-        {"name": "Seeking Alpha", "url": "https://seekingalpha.com/feed.xml", "region": "global"},
+        {
+            "name": "Financial Times",
+            "url": "https://www.ft.com/rss/home/uk",
+            "region": "global",
+        },
+        {
+            "name": "Bloomberg Markets",
+            "url": "https://feeds.bloomberg.com/markets/news.rss",
+            "region": "global",
+        },
+        {
+            "name": "CNBC Finance",
+            "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
+            "region": "global",
+        },
+        {
+            "name": "Wall Street Journal",
+            "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+            "region": "global",
+        },
+        {
+            "name": "Reuters Business",
+            "url": "https://feeds.reuters.com/reuters/businessNews",
+            "region": "global",
+        },
+        {
+            "name": "MarketWatch",
+            "url": "https://feeds.marketwatch.com/marketwatch/realtimeheadlines/",
+            "region": "global",
+        },
+        {
+            "name": "Forbes Finance",
+            "url": "https://www.forbes.com/investing/feed2/",
+            "region": "global",
+        },
+        {
+            "name": "Seeking Alpha",
+            "url": "https://seekingalpha.com/feed.xml",
+            "region": "global",
+        },
     ],
     "security": [
-        {"name": "Krebs on Security", "url": "https://krebsonsecurity.com/feed/", "region": "global"},
-        {"name": "Schneier on Security", "url": "https://www.schneier.com/feed/atom", "region": "global"},
-        {"name": "The Hacker News", "url": "https://feeds.feedburner.com/TheHackersNews", "region": "global"},
-        {"name": "Dark Reading", "url": "https://www.darkreading.com/rss.xml", "region": "global"},
-        {"name": "SecurityWeek", "url": "https://www.securityweek.com/feed", "region": "global"},
-        {"name": "Threatpost", "url": "https://threatpost.com/feed/", "region": "global"},
-        {"name": "BleepingComputer", "url": "https://www.bleepingcomputer.com/feed/", "region": "global"},
-        {"name": "CISA Alerts", "url": "https://www.cisa.gov/cybersecurity-advisories/all.xml", "region": "us"},
+        {
+            "name": "Krebs on Security",
+            "url": "https://krebsonsecurity.com/feed/",
+            "region": "global",
+        },
+        {
+            "name": "Schneier on Security",
+            "url": "https://www.schneier.com/feed/atom",
+            "region": "global",
+        },
+        {
+            "name": "The Hacker News",
+            "url": "https://feeds.feedburner.com/TheHackersNews",
+            "region": "global",
+        },
+        {
+            "name": "Dark Reading",
+            "url": "https://www.darkreading.com/rss.xml",
+            "region": "global",
+        },
+        {
+            "name": "SecurityWeek",
+            "url": "https://www.securityweek.com/feed",
+            "region": "global",
+        },
+        {
+            "name": "Threatpost",
+            "url": "https://threatpost.com/feed/",
+            "region": "global",
+        },
+        {
+            "name": "BleepingComputer",
+            "url": "https://www.bleepingcomputer.com/feed/",
+            "region": "global",
+        },
+        {
+            "name": "CISA Alerts",
+            "url": "https://www.cisa.gov/cybersecurity-advisories/all.xml",
+            "region": "us",
+        },
     ],
     "geopolitics": [
-        {"name": "Foreign Affairs", "url": "https://www.foreignaffairs.com/rss.xml", "region": "global"},
-        {"name": "Foreign Policy", "url": "https://foreignpolicy.com/feed/", "region": "global"},
-        {"name": "The Economist", "url": "https://www.economist.com/international/rss.xml", "region": "global"},
-        {"name": "War on the Rocks", "url": "https://warontherocks.com/feed/", "region": "global"},
-        {"name": "Defense One", "url": "https://www.defenseone.com/rss/all/", "region": "global"},
-        {"name": "RAND Blog", "url": "https://www.rand.org/blog/articles.xml", "region": "global"},
-        {"name": "Bellingcat", "url": "https://www.bellingcat.com/feed/", "region": "global"},
-        {"name": "Crisis Group", "url": "https://www.crisisgroup.org/rss.xml", "region": "global"},
+        {
+            "name": "Foreign Affairs",
+            "url": "https://www.foreignaffairs.com/rss.xml",
+            "region": "global",
+        },
+        {
+            "name": "Foreign Policy",
+            "url": "https://foreignpolicy.com/feed/",
+            "region": "global",
+        },
+        {
+            "name": "The Economist",
+            "url": "https://www.economist.com/international/rss.xml",
+            "region": "global",
+        },
+        {
+            "name": "War on the Rocks",
+            "url": "https://warontherocks.com/feed/",
+            "region": "global",
+        },
+        {
+            "name": "Defense One",
+            "url": "https://www.defenseone.com/rss/all/",
+            "region": "global",
+        },
+        {
+            "name": "RAND Blog",
+            "url": "https://www.rand.org/blog/articles.xml",
+            "region": "global",
+        },
+        {
+            "name": "Bellingcat",
+            "url": "https://www.bellingcat.com/feed/",
+            "region": "global",
+        },
+        {
+            "name": "Crisis Group",
+            "url": "https://www.crisisgroup.org/rss.xml",
+            "region": "global",
+        },
     ],
     "energy": [
-        {"name": "Oil Price", "url": "https://oilprice.com/rss/main", "region": "global"},
-        {"name": "Energy Monitor", "url": "https://www.energymonitor.ai/feed", "region": "global"},
-        {"name": "Rigzone", "url": "https://www.rigzone.com/news/rss/rigzone_latest.aspx", "region": "global"},
-        {"name": "Reuters Energy", "url": "https://feeds.reuters.com/reuters/environment", "region": "global"},
+        {
+            "name": "Oil Price",
+            "url": "https://oilprice.com/rss/main",
+            "region": "global",
+        },
+        {
+            "name": "Energy Monitor",
+            "url": "https://www.energymonitor.ai/feed",
+            "region": "global",
+        },
+        {
+            "name": "Rigzone",
+            "url": "https://www.rigzone.com/news/rss/rigzone_latest.aspx",
+            "region": "global",
+        },
+        {
+            "name": "Reuters Energy",
+            "url": "https://feeds.reuters.com/reuters/environment",
+            "region": "global",
+        },
     ],
     "health": [
-        {"name": "WHO News", "url": "https://www.who.int/rss-feeds/news-english.xml", "region": "global"},
-        {"name": "CDC Newsroom", "url": "https://tools.cdc.gov/api/v2/resources/media/403372.rss", "region": "us"},
-        {"name": "STAT News", "url": "https://www.statnews.com/feed/", "region": "global"},
+        {
+            "name": "WHO News",
+            "url": "https://www.who.int/rss-feeds/news-english.xml",
+            "region": "global",
+        },
+        {
+            "name": "CDC Newsroom",
+            "url": "https://tools.cdc.gov/api/v2/resources/media/403372.rss",
+            "region": "us",
+        },
+        {
+            "name": "STAT News",
+            "url": "https://www.statnews.com/feed/",
+            "region": "global",
+        },
     ],
 }
 
 # Flat list of all feeds for easy iteration
 ALL_FEEDS: List[Dict[str, str]] = [
-    {**feed, "category": cat}
-    for cat, feeds in RSS_FEEDS.items()
-    for feed in feeds
+    {**feed, "category": cat} for cat, feeds in RSS_FEEDS.items() for feed in feeds
 ]
 
 
@@ -115,14 +297,46 @@ class NewsAggregator:
 
     # Negative-sentiment keywords for quick scoring
     _NEGATIVE_KEYWORDS = {
-        "attack", "war", "conflict", "crisis", "killed", "dead", "disaster",
-        "explosion", "missile", "bomb", "sanction", "threat", "hack", "breach",
-        "collapse", "crash", "fail", "protest", "coup", "arrest", "fire",
-        "flood", "earthquake", "hurricane", "pandemic", "outbreak",
+        "attack",
+        "war",
+        "conflict",
+        "crisis",
+        "killed",
+        "dead",
+        "disaster",
+        "explosion",
+        "missile",
+        "bomb",
+        "sanction",
+        "threat",
+        "hack",
+        "breach",
+        "collapse",
+        "crash",
+        "fail",
+        "protest",
+        "coup",
+        "arrest",
+        "fire",
+        "flood",
+        "earthquake",
+        "hurricane",
+        "pandemic",
+        "outbreak",
     }
     _POSITIVE_KEYWORDS = {
-        "peace", "agreement", "deal", "growth", "recovery", "breakthrough",
-        "alliance", "cooperation", "record", "success", "advance", "invest",
+        "peace",
+        "agreement",
+        "deal",
+        "growth",
+        "recovery",
+        "breakthrough",
+        "alliance",
+        "cooperation",
+        "record",
+        "success",
+        "advance",
+        "invest",
     }
 
     CACHE_TTL = 300  # 5 minutes
@@ -221,9 +435,7 @@ class NewsAggregator:
         # Cache in Redis if available
         if self._redis:
             try:
-                payload = json.dumps(
-                    [self._item_to_dict(i) for i in deduped[:200]]
-                )
+                payload = json.dumps([self._item_to_dict(i) for i in deduped[:200]])
                 await self._redis.setex("intelligence:news", self.CACHE_TTL, payload)  # type: ignore[attr-defined]
             except Exception as exc:
                 logger.debug("Redis news cache write failed: %s", exc)
@@ -243,9 +455,7 @@ class NewsAggregator:
             logger.debug("Feed fetch failed %s: %s", feed["name"], exc)
             return []
 
-    def _parse_rss(
-        self, xml_text: str, feed: Dict[str, str]
-    ) -> List[NewsItem]:
+    def _parse_rss(self, xml_text: str, feed: Dict[str, str]) -> List[NewsItem]:
         """Parse RSS/Atom XML into NewsItem objects (no external lib required)."""
         import xml.etree.ElementTree as ET
 
@@ -255,6 +465,7 @@ class NewsAggregator:
             xml_text = xml_text.strip()
             # Remove default namespace declarations to simplify parsing
             import re
+
             xml_clean = re.sub(r' xmlns[^"]*"[^"]*"', "", xml_text)
             root = ET.fromstring(xml_clean)
         except ET.ParseError:
@@ -270,15 +481,14 @@ class NewsAggregator:
         for entry in entries[:20]:  # max 20 per feed
             title = self._text(entry, ["title"])
             link = (
-                self._text(entry, ["link"])
-                or self._attr(entry, "link", "href")
-                or ""
+                self._text(entry, ["link"]) or self._attr(entry, "link", "href") or ""
             )
-            summary = (
-                self._text(entry, ["description", "summary", "content"])
-                or ""
-            )[:400]
-            pub_date = self._text(entry, ["pubDate", "published", "updated", "dc:date"]) or ""
+            summary = (self._text(entry, ["description", "summary", "content"]) or "")[
+                :400
+            ]
+            pub_date = (
+                self._text(entry, ["pubDate", "published", "updated", "dc:date"]) or ""
+            )
 
             if not title or not link:
                 continue
@@ -331,19 +541,24 @@ class NewsAggregator:
             return time.time()
         from datetime import timezone
         from email.utils import parsedate_to_datetime
+
         try:
             return parsedate_to_datetime(date_str).timestamp()
         except Exception:
             pass
         import re
+
         # ISO 8601 – e.g. 2024-01-15T12:00:00Z
         match = re.match(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", date_str)
         if match:
             from datetime import datetime
+
             try:
-                return datetime.fromisoformat(match.group(1)).replace(
-                    tzinfo=timezone.utc
-                ).timestamp()
+                return (
+                    datetime.fromisoformat(match.group(1))
+                    .replace(tzinfo=timezone.utc)
+                    .timestamp()
+                )
             except Exception:
                 pass
         return time.time()
@@ -385,17 +600,21 @@ class NewsAggregator:
 
             async with AsyncSessionLocal() as session:
                 for item in items:
-                    stmt = pg_insert(NewsItemDB).values(
-                        id=item.id,
-                        title=item.title[:1000],
-                        summary=(item.summary or "")[:2000],
-                        url=item.url[:2000],
-                        source=item.source,
-                        category=item.category,
-                        region=item.region,
-                        published_at=item.published_at,
-                        sentiment_score=item.sentiment_score,
-                    ).on_conflict_do_nothing(index_elements=["id"])
+                    stmt = (
+                        pg_insert(NewsItemDB)
+                        .values(
+                            id=item.id,
+                            title=item.title[:1000],
+                            summary=(item.summary or "")[:2000],
+                            url=item.url[:2000],
+                            source=item.source,
+                            category=item.category,
+                            region=item.region,
+                            published_at=item.published_at,
+                            sentiment_score=item.sentiment_score,
+                        )
+                        .on_conflict_do_nothing(index_elements=["id"])
+                    )
                     await session.execute(stmt)
                 await session.commit()
         except Exception as exc:
