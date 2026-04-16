@@ -4,9 +4,17 @@
  * Displays AI-generated summaries from the local Ollama model alongside
  * recent headlines from the news aggregator.
  */
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { NewsCategory, NewsItem, IntelligenceBrief as BriefType, OllamaStatus } from "../types/intelligence";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+interface SentimentPoint {
+  ts: number;
+  sentiment: number;
+  count: number;
+}
 
 const CATEGORIES: { id: NewsCategory; label: string; icon: string }[] = [
   { id: "world", label: "World", icon: "🌍" },
@@ -41,6 +49,25 @@ export default function IntelligenceBriefPanel({
 }: IntelligenceBriefProps) {
   const [activeCategory, setActiveCategory] = useState<NewsCategory>("world");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [sentimentPoints, setSentimentPoints] = useState<SentimentPoint[]>([]);
+
+  const loadSentiment = useCallback(async () => {
+    try {
+      const resp = await fetch(`${API_URL}/api/intelligence/sentiment/timeline?hours=24`);
+      if (resp.ok) {
+        const data: SentimentPoint[] = await resp.json();
+        setSentimentPoints(data);
+      }
+    } catch {
+      // Optional — sentiment sparkline is progressive enhancement
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSentiment();
+    const id = setInterval(loadSentiment, 300_000); // refresh every 5 min
+    return () => clearInterval(id);
+  }, [loadSentiment]);
 
   const handleCategoryClick = (cat: NewsCategory) => {
     setActiveCategory(cat);
@@ -151,6 +178,13 @@ export default function IntelligenceBriefPanel({
                 {brief.ai_generated ? "✦ AI-synthesized" : "Text summary"}
               </span>
             </div>
+            {/* Sentiment timeline sparkline */}
+            {sentimentPoints.length >= 2 && (
+              <div className="mt-3 pt-2 border-t border-white/10">
+                <p className="text-xs text-gray-600 mb-1">Sentiment (24h)</p>
+                <SentimentSparkline points={sentimentPoints} />
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-xs text-gray-600 italic">
@@ -244,6 +278,60 @@ export default function IntelligenceBriefPanel({
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Inline SVG sentiment timeline sparkline. Positive = green, negative = red. */
+function SentimentSparkline({ points }: { points: SentimentPoint[] }) {
+  const W = 240;
+  const H = 28;
+  const PAD = 2;
+
+  const vals = points.map((p) => p.sentiment);
+  const minV = Math.min(-0.1, ...vals);
+  const maxV = Math.max(0.1, ...vals);
+  const range = maxV - minV;
+
+  const toX = (i: number) => PAD + (i / (points.length - 1)) * (W - PAD * 2);
+  const toY = (v: number) => H - PAD - ((v - minV) / range) * (H - PAD * 2);
+  const zeroY = toY(0);
+
+  const pathD = points
+    .map((p, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(p.sentiment).toFixed(1)}`)
+    .join(" ");
+
+  const lastVal = vals[vals.length - 1];
+  const avgVal = vals.reduce((a, b) => a + b, 0) / vals.length;
+
+  return (
+    <div>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-label="Sentiment timeline">
+        {/* Zero baseline */}
+        <line x1={PAD} y1={zeroY} x2={W - PAD} y2={zeroY} stroke="rgba(255,255,255,0.1)" strokeWidth={0.5} />
+        {/* Sentiment line */}
+        <path
+          d={pathD}
+          fill="none"
+          stroke={avgVal >= 0 ? "#4ade80" : "#f87171"}
+          strokeWidth={1.5}
+          strokeLinejoin="round"
+        />
+        {/* Last value dot */}
+        <circle
+          cx={toX(points.length - 1)}
+          cy={toY(lastVal)}
+          r={2}
+          fill={lastVal >= 0 ? "#4ade80" : "#f87171"}
+        />
+      </svg>
+      <div className="flex justify-between text-xs font-mono text-gray-600 mt-0.5">
+        <span>{points[0] ? new Date(points[0].ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}</span>
+        <span style={{ color: lastVal >= 0 ? "#4ade80" : "#f87171" }}>
+          {lastVal >= 0 ? "+" : ""}{lastVal.toFixed(2)}
+        </span>
+        <span>{points[points.length - 1] ? new Date(points[points.length - 1].ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}</span>
       </div>
     </div>
   );

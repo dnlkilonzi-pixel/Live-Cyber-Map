@@ -94,13 +94,23 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Build frontend
+      # ── Branch A: test against an already-deployed preview URL ──────────
+      - name: Run Playwright against preview deployment
+        if: ${{ secrets.BASE_URL != '' }}
+        run: npx playwright test --reporter=list
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+
+      # ── Branch B: build + serve locally when no preview URL is set ──────
+      - name: Build frontend (local mode)
+        if: ${{ secrets.BASE_URL == '' }}
         run: npm run build
         env:
           NEXT_PUBLIC_API_URL: "http://localhost:8000"
           NEXT_PUBLIC_WS_URL: "ws://localhost:8000/ws"
 
-      - name: Start frontend (background)
+      - name: Start frontend (background, local mode)
+        if: ${{ secrets.BASE_URL == '' }}
         run: |
           npm run start &
           # Wait for the Next.js server to accept connections
@@ -115,7 +125,8 @@ jobs:
         env:
           PORT: 3000
 
-      - name: Run Playwright tests
+      - name: Run Playwright tests (local mode)
+        if: ${{ secrets.BASE_URL == '' }}
         run: npx playwright test --reporter=list
         env:
           BASE_URL: "http://localhost:3000"
@@ -218,6 +229,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           projectPath: .
           args: --config '{"build":{"beforeBuildCommand":"","frontendDist":"../frontend/.next"}}'

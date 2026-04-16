@@ -42,6 +42,7 @@ async def create_rule(body: AlertRuleCreate, db: AsyncSession = Depends(get_db))
         condition=body.condition.value,
         target=body.target,
         threshold=body.threshold,
+        bbox=body.bbox,
         enabled=body.enabled,
     )
     db.add(rule)

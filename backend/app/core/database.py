@@ -22,13 +22,12 @@ logger = logging.getLogger(__name__)
 # Engine & session factory
 # ---------------------------------------------------------------------------
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=False,          # flip to True for SQL debugging
-    pool_pre_ping=True,  # detect stale connections before use
-    pool_size=10,
-    max_overflow=20,
-)
+_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+_engine_kwargs: dict = {"echo": False, "pool_pre_ping": True}
+if not _is_sqlite:
+    _engine_kwargs.update({"pool_size": 10, "max_overflow": 20})
+
+engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

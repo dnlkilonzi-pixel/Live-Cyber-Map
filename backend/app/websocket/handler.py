@@ -30,8 +30,12 @@ _INITIAL_HISTORY_COUNT = 50
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """Main WebSocket endpoint for the Live Cyber Map."""
-    await ws_manager.connect(websocket)
+    accepted = await ws_manager.connect(websocket)
     sub_task: Optional[asyncio.Task] = None  # type: ignore[type-arg]
+
+    # connect() returns False when the IP limit is exceeded (already closed)
+    if not accepted:
+        return
 
     try:
         # ------------------------------------------------------------------ #

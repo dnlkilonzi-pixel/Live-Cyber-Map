@@ -141,6 +141,9 @@ class AttackProcessor:
                 # Broadcast via Redis
                 await self._publish_redis(processed)
 
+                # Evaluate alert rules instantly (ATTACK_TYPE + geofence)
+                await self._check_alerts(processed)
+
                 # Buffer for DB batch write
                 self._pending_db.append(processed)
 
@@ -168,6 +171,22 @@ class AttackProcessor:
                 break
             except Exception as exc:
                 logger.exception("Error in DB flush loop: %s", exc)
+
+    async def _check_alerts(self, event: dict) -> None:
+        """Evaluate alert rules against a freshly processed attack event."""
+        try:
+            from app.services.alert_service import alert_service
+            from app.services.websocket_manager import ws_manager
+
+            fired_list = await alert_service.check_attack_event(event)
+            for alert in fired_list:
+                logger.info("Alert fired: %s", alert.message)
+                await ws_manager.broadcast({
+                    "type": "alert",
+                    "data": alert.model_dump(),
+                })
+        except Exception as exc:
+            logger.debug("Alert check error: %s", exc)
 
     async def _publish_redis(self, event: Dict) -> None:
         """Publish the event to the Redis 'attacks' channel."""

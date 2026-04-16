@@ -4,7 +4,7 @@
  * Rendered via the browser-only react-leaflet library (no API key required).
  * Displays all enabled data layers as circle markers on the 2D surface.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AttackEvent } from "../types/attack";
 import { LayerData, LayerDefinition, LayerState } from "../types/layers";
 import { CountryRisk } from "../types/intelligence";
@@ -26,6 +26,33 @@ interface FlatMapProps {
   onCountryClick?: (iso2: string) => void;
 }
 
+// Available tile layers (all free, no API key required)
+const TILE_LAYERS = [
+  {
+    id: "dark",
+    label: "Dark",
+    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: "abcd",
+  },
+  {
+    id: "light",
+    label: "Light",
+    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: "abcd",
+  },
+  {
+    id: "satellite",
+    label: "Satellite",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+    subdomains: "",
+  },
+] as const;
+
+type TileLayerId = typeof TILE_LAYERS[number]["id"];
+
 export default function FlatMap({
   attacks,
   enabledLayers,
@@ -40,6 +67,8 @@ export default function FlatMap({
   const dataLayerRefs = useRef<
     Record<string, import("leaflet").LayerGroup>
   >({});
+  const tileLayerRef = useRef<import("leaflet").TileLayer | null>(null);
+  const [activeTile, setActiveTile] = useState<TileLayerId>("dark");
 
   // Initialise Leaflet map
   useEffect(() => {
@@ -66,16 +95,14 @@ export default function FlatMap({
         attributionControl: true,
       });
 
-      // Dark tile layer (CartoDB Dark Matter – free, no key)
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        {
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          subdomains: "abcd",
-          maxZoom: 19,
-        }
-      ).addTo(map);
+      // Initial tile layer (dark by default)
+      const tileDef = TILE_LAYERS.find((t) => t.id === "dark")!;
+      const tl = L.tileLayer(tileDef.url, {
+        attribution: tileDef.attribution,
+        subdomains: tileDef.subdomains || "abc",
+        maxZoom: 19,
+      }).addTo(map);
+      tileLayerRef.current = tl;
 
       attackLayerRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
@@ -214,11 +241,65 @@ export default function FlatMap({
     updateLayers();
   }, [enabledLayers, layerData, layerDefinitions, riskScores]);
 
+  // Swap tile layer when activeTile changes
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const swapTile = async () => {
+      const L = (await import("leaflet")).default;
+      const tileDef = TILE_LAYERS.find((t) => t.id === activeTile)!;
+      if (tileLayerRef.current) {
+        mapRef.current!.removeLayer(tileLayerRef.current);
+      }
+      const tl = L.tileLayer(tileDef.url, {
+        attribution: tileDef.attribution,
+        subdomains: tileDef.subdomains || "abc",
+        maxZoom: 19,
+      });
+      tl.addTo(mapRef.current!);
+      tl.bringToBack();
+      tileLayerRef.current = tl;
+    };
+    swapTile();
+  }, [activeTile]);
+
   return (
-    <div
-      ref={containerRef}
-      style={{ width: "100%", height: "100%", background: "#10121c" }}
-    />
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <div
+        ref={containerRef}
+        style={{ width: "100%", height: "100%", background: "#10121c" }}
+      />
+      {/* Tile layer selector */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 24,
+          left: 10,
+          zIndex: 1000,
+          display: "flex",
+          gap: 4,
+        }}
+      >
+        {TILE_LAYERS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTile(t.id)}
+            style={{
+              padding: "3px 8px",
+              fontSize: 10,
+              fontFamily: "monospace",
+              borderRadius: 4,
+              border: activeTile === t.id ? "1px solid #00ff88" : "1px solid rgba(255,255,255,0.2)",
+              color: activeTile === t.id ? "#00ff88" : "#aaa",
+              background: "rgba(0,0,0,0.7)",
+              cursor: "pointer",
+              backdropFilter: "blur(4px)",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

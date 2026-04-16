@@ -349,3 +349,69 @@ async def get_country_risk_trend(
     except Exception as exc:
         logger.warning("Risk trend query failed for %s: %s", iso2, exc)
         raise HTTPException(status_code=503, detail="Database unavailable") from exc
+
+
+# ---------------------------------------------------------------------------
+# Sentiment timeline
+# ---------------------------------------------------------------------------
+
+class SentimentPoint(BaseModel):
+    ts: float
+    sentiment: float
+    count: int
+
+
+@router.get(
+    "/sentiment/timeline",
+    response_model=List[SentimentPoint],
+    tags=["intelligence"],
+    summary="Hourly sentiment score timeline for recent news",
+)
+async def get_sentiment_timeline(
+    region: Optional[str] = Query(default=None, description="Filter by region (e.g. 'global', 'europe')"),
+    hours: int = Query(default=24, ge=1, le=168),
+    db: AsyncSession = Depends(get_db),
+) -> List[SentimentPoint]:
+    """Return hourly average sentiment scores for the past *hours* hours.
+
+    Each bucket represents one hour, with the average sentiment of all news
+    published in that window.  Used by the IntelligenceBriefPanel sparkline.
+    """
+    import time as _time
+
+    from sqlalchemy import func, text
+
+    from app.models.intelligence import NewsItemDB
+
+    t_from = _time.time() - hours * 3600
+
+    try:
+        conditions = [NewsItemDB.published_at >= t_from]
+        if region:
+            conditions.append(NewsItemDB.region == region)
+
+        stmt = (
+            select(
+                # Floor the published_at float to the nearest hour bucket
+                (func.floor(NewsItemDB.published_at / 3600) * 3600).label("bucket"),
+                func.avg(NewsItemDB.sentiment_score).label("avg_sentiment"),
+                func.count(NewsItemDB.id).label("item_count"),
+            )
+            .where(and_(*conditions))
+            .group_by(text("bucket"))
+            .order_by(text("bucket"))
+        )
+        rows = (await db.execute(stmt)).all()
+
+        return [
+            SentimentPoint(
+                ts=float(row.bucket),
+                sentiment=round(float(row.avg_sentiment), 4),
+                count=int(row.item_count),
+            )
+            for row in rows
+        ]
+
+    except Exception as exc:
+        logger.warning("Sentiment timeline query failed: %s", exc)
+        raise HTTPException(status_code=503, detail="Database unavailable") from exc

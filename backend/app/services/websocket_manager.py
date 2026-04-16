@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections import defaultdict
 from typing import Dict, Optional, Set
 
 from fastapi import WebSocket
@@ -17,6 +18,7 @@ from fastapi import WebSocket
 logger = logging.getLogger(__name__)
 
 _REDIS_CHANNEL = "attacks"
+_MAX_CONNECTIONS_PER_IP = 5
 
 
 class WebSocketManager:
@@ -28,16 +30,38 @@ class WebSocketManager:
         self._sub_task: Optional[asyncio.Task] = None  # type: ignore[type-arg]
         # Channel → set of WebSockets (for future targeted broadcasts)
         self._channels: Dict[str, Set[WebSocket]] = {}
+        # Per-IP connection count for rate-limiting
+        self._ip_counts: Dict[str, int] = defaultdict(int)
 
     # ------------------------------------------------------------------
     # Connection lifecycle
     # ------------------------------------------------------------------
 
-    async def connect(self, websocket: WebSocket) -> None:
-        """Accept and register a new WebSocket connection."""
+    async def connect(self, websocket: WebSocket) -> bool:
+        """Accept and register a new WebSocket connection.
+
+        Returns False and rejects the connection if the client IP already
+        has *_MAX_CONNECTIONS_PER_IP* or more active connections.
+        """
+        client_ip = self._get_ip(websocket)
+        if self._ip_counts[client_ip] >= _MAX_CONNECTIONS_PER_IP:
+            logger.warning(
+                "WS connection refused for %s — already at %d connections",
+                client_ip, _MAX_CONNECTIONS_PER_IP,
+            )
+            # Must accept before closing in Starlette
+            await websocket.accept()
+            await websocket.close(code=1008, reason="Too many connections from this IP")
+            return False
+
         await websocket.accept()
         self._active.add(websocket)
-        logger.info("WS connected — total: %d", len(self._active))
+        self._ip_counts[client_ip] += 1
+        logger.info(
+            "WS connected [%s] — total: %d (IP connections: %d)",
+            client_ip, len(self._active), self._ip_counts[client_ip],
+        )
+        return True
 
     def disconnect(self, websocket: WebSocket) -> None:
         """Unregister a WebSocket connection."""
@@ -45,15 +69,25 @@ class WebSocketManager:
         # Clean up any channel memberships
         for members in self._channels.values():
             members.discard(websocket)
+        client_ip = self._get_ip(websocket)
+        if self._ip_counts[client_ip] > 0:
+            self._ip_counts[client_ip] -= 1
         logger.info("WS disconnected — total: %d", len(self._active))
 
     # ------------------------------------------------------------------
     # Broadcasting
     # ------------------------------------------------------------------
 
-    async def broadcast(self, message: Dict) -> None:
-        """Send *message* (as JSON) to every connected client."""
+    async def broadcast(self, message: Dict, priority: int = 0) -> None:
+        """Send *message* (as JSON) to every connected client.
+
+        Low-priority messages (priority < 0) are skipped when the active
+        connection set is large enough to create back-pressure concerns.
+        """
         if not self._active:
+            return
+        # Back-pressure: drop low-priority events when >50 clients connected
+        if priority < 0 and len(self._active) > 50:
             return
         payload = json.dumps(message, default=str)
         dead: Set[WebSocket] = set()
@@ -141,6 +175,24 @@ class WebSocketManager:
             pass
         except Exception as exc:
             logger.warning("Redis subscriber error: %s", exc)
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_ip(websocket: WebSocket) -> str:
+        """Extract the client IP from the WebSocket connection."""
+        try:
+            # Prefer the X-Forwarded-For header (behind a proxy)
+            forwarded = websocket.headers.get("x-forwarded-for")
+            if forwarded:
+                return forwarded.split(",")[0].strip()
+            if websocket.client:
+                return websocket.client.host
+        except Exception:
+            pass
+        return "unknown"
 
 
 # Module-level singleton

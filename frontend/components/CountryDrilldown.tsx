@@ -2,15 +2,25 @@
  * CountryDrilldown – modal showing full detail for a selected country.
  *
  * Sections:
- *   1. Risk breakdown (composite + sub-scores)
+ *   1. Risk breakdown (composite + sub-scores) + 24-hour sparkline
  *   2. Recent news items filtered by country name
  *   3. Relevant financial assets (index / currency for the country)
  *   4. Active cyber attacks from/to this country in the last 5 minutes
  */
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CountryRisk, NewsItem } from "../types/intelligence";
 import { MarketSummary, TickerQuote } from "../types/financial";
 import { AttackEvent } from "../types/attack";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+interface TrendPoint {
+  ts: number;
+  risk_score: number;
+  cyber_score: number;
+  news_score: number;
+}
 
 // Map country names / iso2 codes to relevant financial symbols
 const COUNTRY_ASSETS: Record<string, string[]> = {
@@ -48,6 +58,31 @@ export default function CountryDrilldown({
 }: Props) {
   const risk = riskScores.find((r) => r.iso2 === iso2);
   const countryName = risk?.name ?? iso2;
+
+  // Load 24-hour trend data for the sparkline
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
+  const [trendLoading, setTrendLoading] = useState(false);
+
+  const loadTrend = useCallback(async () => {
+    setTrendLoading(true);
+    try {
+      const resp = await fetch(
+        `${API_URL}/api/intelligence/risk/${iso2}/trend?hours=24`
+      );
+      if (resp.ok) {
+        const json = await resp.json();
+        setTrend(json.points ?? []);
+      }
+    } catch {
+      // Silently ignore — sparkline is optional
+    } finally {
+      setTrendLoading(false);
+    }
+  }, [iso2]);
+
+  useEffect(() => {
+    loadTrend();
+  }, [loadTrend]);
 
   // Filter news mentioning the country name
   const countryNews = news
@@ -166,6 +201,22 @@ export default function CountryDrilldown({
                     </div>
                   ))}
                 </div>
+
+                {/* 24-hour multi-series sparkline */}
+                <div className="mt-3 rounded bg-white/5 px-4 py-3">
+                  <p className="text-xs text-gray-500 mb-2">24-hour risk trend</p>
+                  {trendLoading ? (
+                    <div className="h-12 flex items-center justify-center">
+                      <span className="text-xs text-gray-600 animate-pulse">Loading…</span>
+                    </div>
+                  ) : trend.length >= 2 ? (
+                    <MultiSeriesSparkline points={trend} />
+                  ) : (
+                    <div className="h-12 flex items-center justify-center">
+                      <span className="text-xs text-gray-600">No trend data yet</span>
+                    </div>
+                  )}
+                </div>
               </section>
             ) : (
               <p className="text-xs text-gray-500">No risk data available for {countryName}.</p>
@@ -267,3 +318,74 @@ const ATTACK_COLORS: Record<string, string> = {
   XSS: "#8888ff",
   ZeroDay: "#ffffff",
 };
+
+/** Inline SVG multi-series sparkline (risk + cyber + news). No external deps. */
+function MultiSeriesSparkline({ points }: { points: TrendPoint[] }) {
+  const W = 340;
+  const H = 52;
+  const PAD = 4;
+
+  const allValues = points.flatMap((p) => [p.risk_score, p.cyber_score, p.news_score]);
+  const minV = Math.min(...allValues);
+  const maxV = Math.max(...allValues);
+  const range = maxV - minV || 1;
+
+  const toX = (i: number) => PAD + (i / (points.length - 1)) * (W - PAD * 2);
+  const toY = (v: number) => H - PAD - ((v - minV) / range) * (H - PAD * 2);
+
+  const series = [
+    { key: "risk_score" as keyof TrendPoint, color: "#f87171", label: "Risk" },
+    { key: "cyber_score" as keyof TrendPoint, color: "#60a5fa", label: "Cyber" },
+    { key: "news_score" as keyof TrendPoint, color: "#fbbf24", label: "News" },
+  ];
+
+  const lastRisk = points[points.length - 1].risk_score;
+  const firstRisk = points[0].risk_score;
+  const delta = lastRisk - firstRisk;
+
+  return (
+    <div>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-label="24h multi-series risk sparkline">
+        {series.map(({ key, color }) => {
+          const pathD = points
+            .map((p, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(p[key] as number).toFixed(1)}`)
+            .join(" ");
+          return (
+            <path
+              key={key}
+              d={pathD}
+              fill="none"
+              stroke={color}
+              strokeWidth={1.5}
+              strokeLinejoin="round"
+              strokeOpacity={key === "risk_score" ? 1 : 0.55}
+            />
+          );
+        })}
+        {/* Last-value dot for composite risk */}
+        <circle
+          cx={toX(points.length - 1)}
+          cy={toY(lastRisk)}
+          r={2.5}
+          fill="#f87171"
+        />
+      </svg>
+      <div className="flex items-center justify-between mt-1 text-xs font-mono">
+        <div className="flex gap-2">
+          {series.map(({ label, color }) => (
+            <span key={label} style={{ color }} className="flex items-center gap-1">
+              <span className="inline-block w-2 h-0.5 rounded" style={{ background: color }} />
+              {label}
+            </span>
+          ))}
+        </div>
+        <span
+          className="text-xs font-mono"
+          style={{ color: delta >= 0 ? "#f87171" : "#4ade80" }}
+        >
+          {delta >= 0 ? "+" : ""}{delta.toFixed(1)} pts
+        </span>
+      </div>
+    </div>
+  );
+}

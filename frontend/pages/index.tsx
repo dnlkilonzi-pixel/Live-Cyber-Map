@@ -78,6 +78,61 @@ export default function Home() {
 
   useEffect(() => { applyTheme(theme); persist.saveTheme(theme); }, [theme]); // eslint-disable-line react-hooks/exhaustive-deps -- persist is a stable object from usePersistSettings (useCallback references)
 
+  // ── Restore state from URL hash (share links) ─────────────────────────
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.replace(/^#/, "");
+    if (!hash) return;
+    try {
+      const params = new URLSearchParams(hash);
+      const v = params.get("view");
+      const t = params.get("theme");
+      const l = params.get("left");
+      const r = params.get("right");
+      if (v === "globe" || v === "flat") setMapView(v);
+      if (t === "cyber" || t === "tech" || t === "finance") setTheme(t);
+      if (l) setLeftPanel((l as LeftPanel) || null);
+      if (r) setRightPanel((r as RightPanel) || null);
+    } catch {
+      // Invalid hash — ignore
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Export: capture the map canvas as PNG ──────────────────────────────
+  const handleExportPng = () => {
+    // Grab the first canvas in the document (Globe or Leaflet map)
+    const canvas = document.querySelector("canvas");
+    if (!canvas) {
+      alert("No map canvas found. Switch to Globe view for PNG export.");
+      return;
+    }
+    try {
+      const dataUrl = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `intel-map-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.png`;
+      a.click();
+    } catch {
+      alert("Could not capture map — cross-origin tiles may block this in 2D mode.");
+    }
+  };
+
+  // ── Share: encode current view state into URL hash ─────────────────────
+  const handleCopyShareLink = () => {
+    const hash = new URLSearchParams({
+      view: mapView,
+      theme,
+      left: leftPanel ?? "",
+      right: rightPanel ?? "",
+    }).toString();
+    const url = `${window.location.origin}${window.location.pathname}#${hash}`;
+    navigator.clipboard.writeText(url).then(() => {
+      alert("Share link copied to clipboard!");
+    }).catch(() => {
+      prompt("Copy this link:", url);
+    });
+  };
+
   function handlePlay() {
     sendMessage("start_replay", { speed: replaySpeed });
     setIsReplaying(true);
@@ -184,7 +239,8 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Panel buttons */}
+            {/* Desktop-only panel + action buttons */}
+            {!isMobile && (<>
             {[
               { key: "intel" as RightPanel, icon: "📰", label: "INTEL" },
               { key: "risk" as RightPanel, icon: "🌡️", label: "RISK" },
@@ -228,8 +284,25 @@ export default function Home() {
               🤖 AI
             </button>
 
+            {/* Export / Share */}
+            <button
+              onClick={handleExportPng}
+              className="px-2 py-1 text-xs border border-white/20 text-gray-400 hover:text-white rounded transition-colors"
+              title="Download map as PNG"
+            >
+              💾 PNG
+            </button>
+            <button
+              onClick={handleCopyShareLink}
+              className="px-2 py-1 text-xs border border-white/20 text-gray-400 hover:text-white rounded transition-colors"
+              title="Copy share link"
+            >
+              🔗 SHARE
+            </button>
+
             {/* Notification tray */}
             <NotificationTray notifications={notifications} onClear={clearNotifications} />
+            </>)}
           </div>
         </div>
 
@@ -237,9 +310,15 @@ export default function Home() {
         <AnimatePresence>
           {leftPanel && (
             <motion.div key={`left-${leftPanel}`}
-              initial={{ x: -320, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -320, opacity: 0 }}
+              initial={isMobile ? { y: "100%", opacity: 0 } : { x: -320, opacity: 0 }}
+              animate={isMobile ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
+              exit={isMobile ? { y: "100%", opacity: 0 } : { x: -320, opacity: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="absolute top-10 left-0 bottom-0 z-20 side-panel overflow-hidden" style={{ width: 320 }}>
+              className="absolute z-20 side-panel overflow-hidden"
+              style={isMobile
+                ? { left: 0, right: 0, bottom: 0, height: "60vh", borderTopLeftRadius: 12, borderTopRightRadius: 12 }
+                : { top: 10, left: 0, bottom: 0, width: 320 }
+              }>
               {leftPanel === "dashboard" ? (
                 <div className="relative h-full">
                   <button onClick={() => setLeftPanel(null)} className="absolute top-2 right-2 z-10 text-gray-500 hover:text-white text-lg p-1">×</button>
@@ -253,7 +332,7 @@ export default function Home() {
         </AnimatePresence>
 
         {/* Dashboard quick-open tab */}
-        {!leftPanel && (
+        {!leftPanel && !isMobile && (
           <div className="absolute top-14 left-0 z-20 flex flex-col gap-1 p-1">
             <button onClick={() => toggleLeft("dashboard")} title="Dashboard"
               className="px-2 py-2 rounded-r border border-white/10 text-gray-500 hover:text-white hover:bg-white/10 transition-colors text-xs">📊</button>
@@ -266,9 +345,15 @@ export default function Home() {
         <AnimatePresence>
           {rightPanel && (
             <motion.div key={`right-${rightPanel}`}
-              initial={{ x: 320, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 320, opacity: 0 }}
+              initial={isMobile ? { y: "100%", opacity: 0 } : { x: 320, opacity: 0 }}
+              animate={isMobile ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
+              exit={isMobile ? { y: "100%", opacity: 0 } : { x: 320, opacity: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="absolute top-10 right-0 bottom-0 z-20 side-panel-right overflow-hidden" style={{ width: 320 }}>
+              className="absolute z-20 side-panel-right overflow-hidden"
+              style={isMobile
+                ? { left: 0, right: 0, bottom: 0, height: "65vh", borderTopLeftRadius: 12, borderTopRightRadius: 12 }
+                : { top: 10, right: 0, bottom: 0, width: 320 }
+              }>
               {rightPanel === "intel" && (
                 <IntelligenceBriefPanel
                   news={intelligence.news} brief={intelligence.brief} ollamaStatus={intelligence.ollamaStatus}
@@ -288,10 +373,41 @@ export default function Home() {
           )}
         </AnimatePresence>
 
-        {/* Attack feed (right, when right panel closed) */}
-        {!rightPanel && (
+        {/* Attack feed (right, when right panel closed, desktop only) */}
+        {!rightPanel && !isMobile && (
           <div className="absolute top-10 right-0 bottom-16 z-10 overflow-hidden">
             <AttackFeed attacks={attacks} />
+          </div>
+        )}
+
+        {/* ── Mobile bottom navigation bar ───────────────────── */}
+        {isMobile && (
+          <div className="absolute bottom-0 left-0 right-0 z-30 flex items-center justify-around px-2 py-2 bg-black/80 border-t border-white/10 backdrop-blur-md">
+            <button onClick={() => toggleLeft("dashboard")}
+              className={`flex flex-col items-center gap-0.5 text-xs ${leftPanel === "dashboard" ? "text-[var(--color-accent)]" : "text-gray-400"}`}>
+              <span>📊</span>
+              <span className="text-[10px]">Stats</span>
+            </button>
+            <button onClick={() => toggleLeft("layers")}
+              className={`flex flex-col items-center gap-0.5 text-xs ${leftPanel === "layers" ? "text-[var(--color-accent)]" : "text-gray-400"}`}>
+              <span>🗂️</span>
+              <span className="text-[10px]">Layers</span>
+            </button>
+            <button onClick={() => toggleRight("intel")}
+              className={`flex flex-col items-center gap-0.5 text-xs ${rightPanel === "intel" ? "text-[var(--color-accent)]" : "text-gray-400"}`}>
+              <span>📰</span>
+              <span className="text-[10px]">Intel</span>
+            </button>
+            <button onClick={() => toggleRight("risk")}
+              className={`flex flex-col items-center gap-0.5 text-xs ${rightPanel === "risk" ? "text-[var(--color-accent)]" : "text-gray-400"}`}>
+              <span>🌡️</span>
+              <span className="text-[10px]">Risk</span>
+            </button>
+            <button onClick={() => setShowAlerts(true)}
+              className="flex flex-col items-center gap-0.5 text-xs text-gray-400">
+              <span>🚨</span>
+              <span className="text-[10px]">Alerts</span>
+            </button>
           </div>
         )}
 

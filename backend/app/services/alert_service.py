@@ -52,6 +52,67 @@ class AlertService:
     # Evaluation
     # ------------------------------------------------------------------
 
+    async def check_attack_event(self, event: dict) -> List[AlertFired]:
+        """Evaluate ATTACK_TYPE and geofence rules against a live attack event.
+
+        Called directly from the AttackProcessor so alerts fire instantly.
+        Also evaluates BBOX (geofence) rules if the event has dest coordinates.
+        """
+        attack_type = event.get("attack_type", "")
+        dest_country = event.get("dest_country", "")
+        dest_lat = event.get("dest_lat")
+        dest_lng = event.get("dest_lng")
+
+        fired: List[AlertFired] = []
+        async with self._lock:
+            for rule in self._rules:
+                if not rule.enabled:
+                    continue
+
+                # ATTACK_TYPE rule
+                if rule.condition == "attack_type":
+                    if rule.target and rule.target != attack_type:
+                        continue
+                    if self._is_cooled_down(rule.id):
+                        fired.append(AlertFired(
+                            rule_id=rule.id,
+                            rule_name=rule.name,
+                            condition=rule.condition,
+                            message=f"{attack_type} attack detected targeting {dest_country}",
+                            fired_at=time.time(),
+                        ))
+                        self._last_fired[rule.id] = time.time()
+
+                # BBOX (geofence) rule
+                elif rule.condition == "bbox" and dest_lat is not None and dest_lng is not None:
+                    if rule.bbox and self._point_in_bbox(float(dest_lat), float(dest_lng), rule.bbox):
+                        if self._is_cooled_down(rule.id):
+                            fired.append(AlertFired(
+                                rule_id=rule.id,
+                                rule_name=rule.name,
+                                condition=rule.condition,
+                                message=(
+                                    f"{attack_type} attack targeted {dest_country} "
+                                    f"within geofence ({dest_lat:.2f}, {dest_lng:.2f})"
+                                ),
+                                fired_at=time.time(),
+                            ))
+                            self._last_fired[rule.id] = time.time()
+
+        return fired
+
+    @staticmethod
+    def _point_in_bbox(lat: float, lng: float, bbox: str) -> bool:
+        """Return True if (lat, lng) is inside the bbox string 'lat_min,lng_min,lat_max,lng_max'."""
+        try:
+            parts = [float(x) for x in bbox.split(",")]
+            if len(parts) != 4:
+                return False
+            lat_min, lng_min, lat_max, lng_max = parts
+            return lat_min <= lat <= lat_max and lng_min <= lng <= lng_max
+        except (ValueError, AttributeError):
+            return False
+
     async def check_country_risk(self, iso2: str, risk_score: float) -> List[AlertFired]:
         """Check RISK_ABOVE rules for a given country."""
         fired: List[AlertFired] = []

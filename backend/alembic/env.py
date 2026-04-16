@@ -1,0 +1,93 @@
+"""Alembic environment configuration for the Live Cyber Map backend.
+
+Supports both sync (offline) and async (online) migration modes, using
+the same DATABASE_URL that the FastAPI application uses.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import os
+from logging.config import fileConfig
+
+from sqlalchemy import pool
+from sqlalchemy.engine import Connection
+from sqlalchemy.ext.asyncio import async_engine_from_config
+
+from alembic import context
+
+# ---------------------------------------------------------------------------
+# Import all ORM models so Alembic can detect schema changes (autogenerate)
+# ---------------------------------------------------------------------------
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+from app.core.database import Base  # noqa: E402
+from app.models import attack, alert, intelligence, financial  # noqa: E402,F401
+
+# ---------------------------------------------------------------------------
+# Alembic Config
+# ---------------------------------------------------------------------------
+config = context.config
+
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+target_metadata = Base.metadata
+
+# Override the URL from DATABASE_URL env var when set (e.g. in CI / production)
+_db_url = os.environ.get("DATABASE_URL")
+if _db_url:
+    # Alembic needs a *sync* driver for offline mode; swap asyncpg → psycopg2
+    # for the URL used in offline mode only.
+    config.set_main_option("sqlalchemy.url", _db_url)
+
+
+def run_migrations_offline() -> None:
+    """Run migrations in 'offline' mode (no live DB connection required)."""
+    url = config.get_main_option("sqlalchemy.url")
+    # Use the sync variant of the URL for offline SQL generation
+    sync_url = url.replace("+asyncpg", "+psycopg2").replace("+aiosqlite", "")
+    context.configure(
+        url=sync_url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+        compare_type=True,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def do_run_migrations(connection: Connection) -> None:
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+async def run_async_migrations() -> None:
+    """Run migrations against the live async engine."""
+    connectable = async_engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+    async with connectable.connect() as connection:
+        await connection.run_sync(do_run_migrations)
+    await connectable.dispose()
+
+
+def run_migrations_online() -> None:
+    """Run migrations in 'online' mode using the async engine."""
+    asyncio.run(run_async_migrations())
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()

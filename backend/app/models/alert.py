@@ -17,6 +17,7 @@ class AlertCondition(str, enum.Enum):
     RISK_ABOVE = "risk_above"          # country risk_score > threshold
     ATTACK_TYPE = "attack_type"        # attack of specific type detected
     PRICE_CHANGE = "price_change"      # asset price change > threshold %
+    BBOX = "bbox"                      # attack destination inside lat/lng bounding box
 
 
 class AlertRule(Base):
@@ -31,6 +32,7 @@ class AlertRule(Base):
     # Condition parameters (nullable; which ones apply depends on condition type)
     target: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)   # country iso2, attack type, or asset symbol
     threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)    # numeric threshold
+    bbox: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)     # geofence: "lat_min,lng_min,lat_max,lng_max"
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -49,6 +51,7 @@ class AlertRuleCreate(BaseModel):
     condition: AlertCondition
     target: Optional[str] = None
     threshold: Optional[float] = None
+    bbox: Optional[str] = None
     enabled: bool = True
 
 
@@ -60,6 +63,7 @@ class AlertRuleResponse(BaseModel):
     condition: str
     target: Optional[str]
     threshold: Optional[float]
+    bbox: Optional[str]
     enabled: bool
     created_at: datetime
 
