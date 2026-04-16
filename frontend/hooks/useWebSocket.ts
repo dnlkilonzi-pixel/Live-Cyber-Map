@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AttackEvent, Stats, WebSocketMessage } from "../types/attack";
+import { AlertNotification } from "../components/NotificationTray";
 
 const WS_URL =
   process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000/ws";
@@ -14,8 +15,13 @@ interface UseWebSocketReturn {
   isConnected: boolean;
   isAnomaly: boolean;
   anomalyScore: number;
+  notifications: AlertNotification[];
+  replaySyncPosition: number | null;
+  reconnectedAt: number | null;
   sendMessage: (type: string, data?: unknown) => void;
   clearHistory: () => void;
+  clearNotifications: () => void;
+  markAllRead: () => void;
 }
 
 export function useWebSocket(): UseWebSocketReturn {
@@ -24,6 +30,9 @@ export function useWebSocket(): UseWebSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [isAnomaly, setIsAnomaly] = useState(false);
   const [anomalyScore, setAnomalyScore] = useState(0);
+  const [notifications, setNotifications] = useState<AlertNotification[]>([]);
+  const [replaySyncPosition, setReplaySyncPosition] = useState<number | null>(null);
+  const [reconnectedAt, setReconnectedAt] = useState<number | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
@@ -32,6 +41,14 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const clearHistory = useCallback(() => {
     setAttacks([]);
+  }, []);
+
+  const clearNotifications = useCallback(() => {
+    setNotifications([]);
+  }, []);
+
+  const markAllRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }, []);
 
   const sendMessage = useCallback((type: string, data: unknown = {}) => {
@@ -50,6 +67,10 @@ export function useWebSocket(): UseWebSocketReturn {
       ws.onopen = () => {
         if (!mountedRef.current) return;
         setIsConnected(true);
+        // If this is a reconnect (not the very first connection), signal it
+        if (reconnectAttemptRef.current > 0) {
+          setReconnectedAt(Date.now());
+        }
         reconnectAttemptRef.current = 0;
       };
 
@@ -90,6 +111,39 @@ export function useWebSocket(): UseWebSocketReturn {
             case "replay_started":
             case "replay_stopped":
               break;
+
+            case "replay_seek":
+              setReplaySyncPosition(msg.position);
+              break;
+
+            case "alert": {
+              const alertData = msg.data;
+              const newNotif: AlertNotification = {
+                id: `${alertData.rule_id}-${alertData.fired_at}`,
+                rule_name: alertData.rule_name,
+                message: alertData.message,
+                fired_at: alertData.fired_at,
+                read: false,
+              };
+              setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
+              // Browser Notification API
+              if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+                new Notification(`Alert: ${alertData.rule_name}`, {
+                  body: alertData.message,
+                  icon: "/favicon.ico",
+                });
+              } else if (typeof Notification !== "undefined" && Notification.permission !== "denied") {
+                Notification.requestPermission().then((perm) => {
+                  if (perm === "granted") {
+                    new Notification(`Alert: ${alertData.rule_name}`, {
+                      body: alertData.message,
+                      icon: "/favicon.ico",
+                    });
+                  }
+                });
+              }
+              break;
+            }
 
             default:
               break;
@@ -153,7 +207,12 @@ export function useWebSocket(): UseWebSocketReturn {
     isConnected,
     isAnomaly,
     anomalyScore,
+    notifications,
+    replaySyncPosition,
+    reconnectedAt,
     sendMessage,
     clearHistory,
+    clearNotifications,
+    markAllRead,
   };
 }

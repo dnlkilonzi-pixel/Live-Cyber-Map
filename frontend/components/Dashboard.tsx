@@ -158,6 +158,14 @@ export default function Dashboard({
         )}
       </div>
 
+      {/* Anomaly Score Gauge */}
+      <div className="glass-panel p-3 rounded-lg">
+        <div className="text-gray-500 text-xs uppercase tracking-wider mb-2">
+          Anomaly Score
+        </div>
+        <AnomalyGauge score={anomalyScore} isAnomaly={isAnomaly} />
+      </div>
+
       {/* Top Attackers */}
       <div className="glass-panel p-3 rounded-lg">
         <div className="text-gray-500 text-xs uppercase tracking-wider mb-2">
@@ -218,6 +226,65 @@ export default function Dashboard({
         ) : (
           <p className="text-gray-600 text-xs">Awaiting data…</p>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Semi-circular arc gauge showing anomaly score 0–max. */
+function AnomalyGauge({ score, isAnomaly }: { score: number; isAnomaly: boolean }) {
+  const W = 120;
+  const H = 70;
+  const CX = W / 2;
+  const CY = H - 10;
+  const R = 48;
+  // Cap display at 3.0 for the gauge arc
+  const MAX_SCORE = 3.0;
+  const clampedScore = Math.min(score, MAX_SCORE);
+  const fraction = clampedScore / MAX_SCORE;
+
+  // Arc spans from 180° (left) to 0° (right), i.e. a semi-circle
+  const startAngle = Math.PI;
+  const endAngle = 0;
+  const sweepAngle = startAngle - endAngle; // π radians
+  const fillAngle = startAngle - fraction * sweepAngle;
+
+  const toXY = (angle: number) => ({
+    x: CX + R * Math.cos(angle),
+    y: CY - R * Math.sin(angle),
+  });
+
+  const arcStart = toXY(startAngle);
+  const arcEnd = toXY(endAngle);
+  const needleEnd = toXY(fillAngle);
+
+  const trackPath = `M ${arcStart.x} ${arcStart.y} A ${R} ${R} 0 0 1 ${arcEnd.x} ${arcEnd.y}`;
+  const fillPath = fraction > 0
+    ? `M ${arcStart.x} ${arcStart.y} A ${R} ${R} 0 ${fraction > 0.5 ? 1 : 0} 1 ${needleEnd.x} ${needleEnd.y}`
+    : "";
+
+  const color = isAnomaly ? "#f87171" : score > 0.5 ? "#fbbf24" : "#4ade80";
+
+  return (
+    <div className="flex flex-col items-center">
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-label="Anomaly score gauge">
+        {/* Track */}
+        <path d={trackPath} fill="none" stroke="#1f2937" strokeWidth={8} strokeLinecap="round" />
+        {/* Fill */}
+        {fillPath && (
+          <path d={fillPath} fill="none" stroke={color} strokeWidth={8} strokeLinecap="round" />
+        )}
+        {/* Centre dot */}
+        <circle cx={CX} cy={CY} r={4} fill={color} />
+        {/* Score text */}
+        <text x={CX} y={CY - 14} textAnchor="middle" fill={color} fontSize={13} fontFamily="monospace" fontWeight="bold">
+          {score.toFixed(2)}
+        </text>
+      </svg>
+      <div className="flex justify-between w-full px-1 -mt-1">
+        <span className="text-[10px] text-gray-600 font-mono">0</span>
+        <span className="text-[10px] font-mono" style={{ color }}>{isAnomaly ? "ANOMALY" : "normal"}</span>
+        <span className="text-[10px] text-gray-600 font-mono">{MAX_SCORE}+</span>
       </div>
     </div>
   );

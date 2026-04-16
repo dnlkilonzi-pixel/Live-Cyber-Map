@@ -22,13 +22,12 @@ logger = logging.getLogger(__name__)
 # Engine & session factory
 # ---------------------------------------------------------------------------
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=False,          # flip to True for SQL debugging
-    pool_pre_ping=True,  # detect stale connections before use
-    pool_size=10,
-    max_overflow=20,
-)
+_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+_engine_kwargs: dict = {"echo": False, "pool_pre_ping": True}
+if not _is_sqlite:
+    _engine_kwargs.update({"pool_size": 10, "max_overflow": 20})
+
+engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
@@ -43,6 +42,7 @@ AsyncSessionLocal = async_sessionmaker(
 # Declarative base
 # ---------------------------------------------------------------------------
 
+
 class Base(DeclarativeBase):
     """Shared declarative base for all ORM models."""
 
@@ -50,6 +50,7 @@ class Base(DeclarativeBase):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 async def get_db() -> AsyncSession:  # type: ignore[return]
     """FastAPI dependency that yields an async database session."""
@@ -72,7 +73,12 @@ async def init_db() -> None:
     try:
         async with engine.begin() as conn:
             # Import models so their metadata is registered on Base
-            from app.models import attack  # noqa: F401
+            from app.models import (
+                alert,  # noqa: F401
+                attack,  # noqa: F401
+                financial,  # noqa: F401
+                intelligence,  # noqa: F401
+            )
 
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables created / verified.")

@@ -1,0 +1,30 @@
+{
+  "id": "cyber",
+  "name": "Cyber Ops",
+  "description": "Cyber operations command center – dark matrix aesthetic focused on threat intelligence, anomaly detection, and cyber security feeds.",
+  "icon": "🛡️",
+  "defaultTheme": "cyber",
+  "defaultLayers": ["cyber_attacks", "botnet_activity", "vulnerability_feeds"],
+  "defaultCategory": "security",
+  "appTitle": "Cyber Operations Center",
+  "primaryColor": "#00ff88",
+  "secondaryColor": "#00ffff",
+  "dangerColor": "#ff4444",
+  "globe": {
+    "imageUrl": "https://unpkg.com/three-globe/example/img/earth-dark.jpg",
+    "backgroundColor": "#000011",
+    "atmosphereColor": "#1a237e"
+  },
+  "features": {
+    "cyberFeed": true,
+    "newsFeed": true,
+    "financialTicker": false,
+    "countryRisk": true,
+    "ollamaEnabled": true,
+    "defaultNewsCategory": "security"
+  },
+  "branding": {
+    "topBarText": "CYBER OPS CENTER",
+    "subtitle": "Real-time threat intelligence"
+  }
+}

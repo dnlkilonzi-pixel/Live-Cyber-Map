@@ -12,10 +12,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 
-
 # ---------------------------------------------------------------------------
 # Enum
 # ---------------------------------------------------------------------------
+
 
 class AttackType(str, enum.Enum):
     DDoS = "DDoS"
@@ -32,6 +32,7 @@ class AttackType(str, enum.Enum):
 # ---------------------------------------------------------------------------
 # ORM Model
 # ---------------------------------------------------------------------------
+
 
 class AttackEvent(Base):
     """Persisted record of a single cyber attack event."""
@@ -55,7 +56,9 @@ class AttackEvent(Base):
     # Attack metadata
     attack_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     severity: Mapped[int] = mapped_column(Integer, nullable=False)
-    cluster_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    cluster_id: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, index=True
+    )
 
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -68,6 +71,7 @@ class AttackEvent(Base):
 # ---------------------------------------------------------------------------
 # Pydantic schemas
 # ---------------------------------------------------------------------------
+
 
 class AttackEventCreate(BaseModel):
     """Schema for creating a new AttackEvent (inbound)."""

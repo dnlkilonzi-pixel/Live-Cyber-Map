@@ -11,3 +11,5 @@ python-dotenv==1.0.0
 aioredis==2.0.1
 httpx==0.26.0
 numpy==1.26.3
+yfinance==0.2.36
+aiosqlite==0.20.0

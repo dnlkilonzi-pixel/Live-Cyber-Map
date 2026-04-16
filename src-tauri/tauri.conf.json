@@ -1,0 +1,95 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
+  "build": {
+    "beforeDevCommand": "cd frontend && npm run dev",
+    "beforeBuildCommand": "cd frontend && npm run build",
+    "devPath": "http://localhost:3000",
+    "distDir": "../frontend/out",
+    "withGlobalTauri": false
+  },
+  "package": {
+    "productName": "Global Intelligence Dashboard",
+    "version": "2.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true
+      },
+      "notification": {
+        "all": true
+      },
+      "window": {
+        "all": false,
+        "close": true,
+        "minimize": true,
+        "maximize": true,
+        "startDragging": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "io.github.dnlkilonzi.globalintel",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "longDescription": "Real-time global intelligence dashboard with AI-powered news briefs, interactive maps, financial data, and country risk scores. Runs a local AI model via Ollama — no external API keys required.",
+      "shortDescription": "AI-powered global intelligence command center",
+      "category": "Productivity",
+      "externalBin": [],
+      "copyright": "MIT",
+      "resources": [],
+      "deb": {
+        "depends": []
+      },
+      "macOS": {
+        "frameworks": [],
+        "minimumSystemVersion": "10.15",
+        "exceptionDomain": "localhost",
+        "hardenedRuntime": true
+      },
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": ""
+      }
+    },
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: https: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:8000 ws://localhost:8000 http://localhost:11434 https://api.coingecko.com https://*.basemaps.cartocdn.com https://unpkg.com"
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/DANIELKILONZI/Live-Cyber-Map/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": ""
+    },
+    "windows": [
+      {
+        "title": "Global Intelligence Dashboard",
+        "width": 1600,
+        "height": 950,
+        "minWidth": 1200,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "center": true,
+        "focus": true
+      }
+    ],
+    "systemTray": {
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": false
+    }
+  }
+}

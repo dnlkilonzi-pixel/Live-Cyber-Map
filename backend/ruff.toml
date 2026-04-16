@@ -1,0 +1,5 @@
+# Ruff configuration for the Live Cyber Map backend.
+# Alembic-generated files and versions are excluded from linting.
+exclude = [
+    "alembic/",
+]

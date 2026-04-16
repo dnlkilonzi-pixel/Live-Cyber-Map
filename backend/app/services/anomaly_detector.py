@@ -31,10 +31,10 @@ class AnomalyDetector:
         self._window: deque = deque()
 
         # Running counters (not evicted with the window — all-time totals)
-        self._attacker_counter: Counter = Counter()   # key: source_ip
+        self._attacker_counter: Counter = Counter()  # key: source_ip
         self._attacker_country: Dict[str, str] = {}  # source_ip → country
-        self._target_counter: Counter = Counter()    # key: dest_country
-        self._type_counter: Counter = Counter()      # key: attack_type
+        self._target_counter: Counter = Counter()  # key: dest_country
+        self._type_counter: Counter = Counter()  # key: attack_type
 
         # Per-second buckets for rolling-average calculation
         # deque of ints, each representing count in that second

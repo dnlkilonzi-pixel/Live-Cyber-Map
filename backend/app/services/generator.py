@@ -42,8 +42,8 @@ _SOURCE_COUNTRIES_WEIGHTED: List[Tuple[str, int]] = [
     ("CN", 25),  # China
     ("RU", 22),  # Russia
     ("US", 10),  # United States (also used offensively in simulations)
-    ("IR", 8),   # Iran
-    ("KP", 6),   # North Korea
+    ("IR", 8),  # Iran
+    ("KP", 6),  # North Korea
     ("UA", 5),
     ("BR", 4),
     ("IN", 4),
@@ -96,9 +96,7 @@ class AttackGenerator:
         src_code = random.choices(_SRC_CODES, weights=_SRC_WEIGHTS, k=1)[0]
         # Ensure source ≠ destination
         dst_candidates = [c for c in _DST_CODES if c != src_code]
-        dst_weights = [
-            w for c, w in _TARGET_COUNTRIES_WEIGHTED if c != src_code
-        ]
+        dst_weights = [w for c, w in _TARGET_COUNTRIES_WEIGHTED if c != src_code]
         if not dst_weights:
             dst_weights = [1] * len(dst_candidates)
         dst_code = random.choices(dst_candidates, weights=dst_weights, k=1)[0]
@@ -138,7 +136,9 @@ class AttackGenerator:
             return
         self._running = True
         self._task = asyncio.create_task(self._loop())
-        logger.info("AttackGenerator started at %d events/s", settings.EVENTS_PER_SECOND)
+        logger.info(
+            "AttackGenerator started at %d events/s", settings.EVENTS_PER_SECOND
+        )
 
     async def stop(self) -> None:
         """Stop the generation loop gracefully."""

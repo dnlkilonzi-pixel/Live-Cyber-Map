@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useImperativeHandle, forwardRef, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { AttackEvent, AttackType } from "../types/attack";
@@ -55,20 +55,43 @@ function severityLabel(severity: number): string {
   return "LOW";
 }
 
+const PAGE_SIZE = 20;
+
 interface AttackFeedProps {
   attacks: AttackEvent[];
 }
 
-export default function AttackFeed({ attacks }: AttackFeedProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const recent = attacks.slice(0, 20);
+export interface AttackFeedHandle {
+  prevPage: () => void;
+  nextPage: () => void;
+}
 
-  // Auto-scroll to top (newest items appear at top)
+const AttackFeed = forwardRef<AttackFeedHandle, AttackFeedProps>(function AttackFeed(
+  { attacks },
+  ref
+) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(0);
+
+  const totalPages = Math.max(1, Math.ceil(attacks.length / PAGE_SIZE));
+  // Clamp page in case attacks shrink
+  const safePage = Math.min(page, totalPages - 1);
+  const pageItems = attacks.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  // Expose page navigation to parent via ref
+  useImperativeHandle(ref, () => ({
+    prevPage: () => setPage((p) => Math.max(0, p - 1)),
+    nextPage: () => setPage((p) => Math.min(totalPages - 1, p + 1)),
+  }), [totalPages]);
+
+  // Scroll to top when we're on page 0 and new events arrive
+  const prevLengthRef = useRef(attacks.length);
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = 0;
+    if (attacks.length > prevLengthRef.current && safePage === 0) {
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
     }
-  }, [attacks.length]);
+    prevLengthRef.current = attacks.length;
+  }, [attacks.length, safePage]);
 
   return (
     <div className="flex flex-col w-72 h-full">
@@ -87,15 +110,20 @@ export default function AttackFeed({ attacks }: AttackFeedProps) {
       {/* Scrollable feed */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto dashboard-scroll glass-panel rounded-b-lg p-2 space-y-1"
+        className="flex-1 overflow-y-auto dashboard-scroll glass-panel p-2 space-y-1"
       >
-        {recent.length === 0 ? (
-          <div className="flex items-center justify-center h-32 text-gray-600 text-xs">
-            Waiting for attacks…
+        {pageItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-32 gap-2 text-gray-600">
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+              <circle cx="18" cy="18" r="16" stroke="#374151" strokeWidth="2" />
+              <path d="M10 18 Q18 8 26 18 Q18 28 10 18Z" stroke="#4b5563" strokeWidth="1.5" fill="none" />
+              <circle cx="18" cy="18" r="3" fill="#4b5563" />
+            </svg>
+            <span className="text-xs">Waiting for attacks…</span>
           </div>
         ) : (
           <AnimatePresence initial={false}>
-            {recent.map((attack) => {
+            {pageItems.map((attack) => {
               const color = ATTACK_COLORS[attack.attack_type] ?? "#ffffff";
               const sColor = severityColor(attack.severity);
               const ts = (() => {
@@ -179,6 +207,31 @@ export default function AttackFeed({ attacks }: AttackFeedProps) {
           </AnimatePresence>
         )}
       </div>
+
+      {/* Pagination bar */}
+      {totalPages > 1 && (
+        <div className="glass-panel rounded-b-lg border-t border-gray-700/50 px-3 py-1.5 flex items-center justify-between">
+          <button
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={safePage === 0}
+            className="text-[10px] text-gray-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed px-1 transition-colors"
+          >
+            ◀
+          </button>
+          <span className="text-[10px] text-gray-500 font-mono">
+            {safePage + 1} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={safePage >= totalPages - 1}
+            className="text-[10px] text-gray-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed px-1 transition-colors"
+          >
+            ▶
+          </button>
+        </div>
+      )}
     </div>
   );
-}
+});
+
+export default AttackFeed;

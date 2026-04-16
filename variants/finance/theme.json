@@ -1,0 +1,30 @@
+{
+  "id": "finance",
+  "name": "Finance Center",
+  "description": "Financial markets intelligence dashboard – real-time stocks, crypto, commodities, forex, combined with macroeconomic news and country risk for trading decisions.",
+  "icon": "💹",
+  "defaultTheme": "finance",
+  "defaultLayers": ["market_volatility", "currency_stress", "gdp_growth", "inflation", "trade_routes", "sanctions"],
+  "defaultCategory": "finance",
+  "appTitle": "Global Finance Center",
+  "primaryColor": "#fbbf24",
+  "secondaryColor": "#34d399",
+  "dangerColor": "#f87171",
+  "globe": {
+    "imageUrl": "https://unpkg.com/three-globe/example/img/earth-night.jpg",
+    "backgroundColor": "#080500",
+    "atmosphereColor": "#3d2b00"
+  },
+  "features": {
+    "cyberFeed": false,
+    "newsFeed": true,
+    "financialTicker": true,
+    "countryRisk": true,
+    "ollamaEnabled": true,
+    "defaultNewsCategory": "finance"
+  },
+  "branding": {
+    "topBarText": "GLOBAL FINANCE",
+    "subtitle": "Real-time market intelligence"
+  }
+}

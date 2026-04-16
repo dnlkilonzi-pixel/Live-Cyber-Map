@@ -1,0 +1,29 @@
+repos:
+  # ── Python: ruff (lint + auto-fix) ──────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.4
+    hooks:
+      - id: ruff
+        args: [--select, "E,F,W,I", --ignore, "E501", --fix]
+        files: ^backend/
+
+  # ── TypeScript: tsc type-check ───────────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: tsc
+        name: TypeScript type-check
+        language: node
+        entry: bash -c 'cd frontend && npx tsc --noEmit'
+        pass_filenames: false
+        types: [ts]
+        additional_dependencies: []
+
+  # ── General: trailing whitespace, end-of-file fixer, yaml lint ──────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+        exclude: ^frontend/tsconfig.*\.json$

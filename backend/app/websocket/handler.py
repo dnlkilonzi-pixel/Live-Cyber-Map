@@ -30,8 +30,12 @@ _INITIAL_HISTORY_COUNT = 50
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """Main WebSocket endpoint for the Live Cyber Map."""
-    await ws_manager.connect(websocket)
+    accepted = await ws_manager.connect(websocket)
     sub_task: Optional[asyncio.Task] = None  # type: ignore[type-arg]
+
+    # connect() returns False when the IP limit is exceeded (already closed)
+    if not accepted:
+        return
 
     try:
         # ------------------------------------------------------------------ #
@@ -47,9 +51,7 @@ async def websocket_endpoint(websocket: WebSocket):
         from app.main import redis_client  # noqa: PLC0415
 
         if redis_client is not None:
-            sub_task = asyncio.create_task(
-                _redis_forwarder(websocket, redis_client)
-            )
+            sub_task = asyncio.create_task(_redis_forwarder(websocket, redis_client))
 
         # ------------------------------------------------------------------ #
         # 3. Command loop — handle messages from the client
@@ -83,12 +85,15 @@ async def websocket_endpoint(websocket: WebSocket):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 async def _send_initial_history(websocket: WebSocket) -> None:
     """Push recent events and current stats to a newly connected client."""
     try:
         from app.main import processor  # noqa: PLC0415
 
-        events = processor.get_recent_events(_INITIAL_HISTORY_COUNT) if processor else []
+        events = (
+            processor.get_recent_events(_INITIAL_HISTORY_COUNT) if processor else []
+        )
         stats = anomaly_detector.get_stats()
 
         await websocket.send_text(
@@ -134,7 +139,9 @@ async def _handle_command(websocket: WebSocket, raw: str) -> None:
     try:
         msg = json.loads(raw)
     except json.JSONDecodeError:
-        await websocket.send_text(json.dumps({"type": "error", "detail": "Invalid JSON"}))
+        await websocket.send_text(
+            json.dumps({"type": "error", "detail": "Invalid JSON"})
+        )
         return
 
     command = msg.get("command", "")
@@ -153,7 +160,9 @@ async def _handle_command(websocket: WebSocket, raw: str) -> None:
 
     elif command == "replay":
         await websocket.send_text(
-            json.dumps({"type": "ack", "command": "replay", "status": "not_implemented"})
+            json.dumps(
+                {"type": "ack", "command": "replay", "status": "not_implemented"}
+            )
         )
 
     elif command == "stats":

@@ -39,3 +39,6 @@ Thumbs.db
 # Data volumes
 postgres_data/
 redis_data/
+frontend/tsconfig.tsbuildinfo
+# Tauri build artifacts
+src-tauri/target/
