@@ -186,6 +186,29 @@ class AlertService:
                         self._last_fired[rule.id] = time.time()
         return fired
 
+    async def check_anomaly_score(self, score: float) -> List[AlertFired]:
+        """Check ANOMALY_SCORE rules against the current anomaly score."""
+        fired: List[AlertFired] = []
+        async with self._lock:
+            for rule in self._rules:
+                if not rule.enabled:
+                    continue
+                if rule.condition != "anomaly_score":
+                    continue
+                if rule.threshold is None:
+                    continue
+                if score > rule.threshold:
+                    if self._is_cooled_down(rule.id):
+                        fired.append(AlertFired(
+                            rule_id=rule.id,
+                            rule_name=rule.name,
+                            condition=rule.condition,
+                            message=f"Anomaly score {score:.2f} exceeded threshold {rule.threshold:.2f}",
+                            fired_at=time.time(),
+                        ))
+                        self._last_fired[rule.id] = time.time()
+        return fired
+
     def _is_cooled_down(self, rule_id: int) -> bool:
         last = self._last_fired.get(rule_id, 0.0)
         return (time.time() - last) >= self._cooldown
@@ -205,7 +228,8 @@ class AlertService:
                 logger.warning("AlertService check error: %s", exc)
 
     async def _run_periodic_checks(self) -> None:
-        """Run country risk checks periodically."""
+        """Run country risk and anomaly score checks periodically."""
+        from app.services.anomaly_detector import anomaly_detector
         from app.services.country_risk import country_risk_service
         from app.services.websocket_manager import ws_manager
 
@@ -218,6 +242,16 @@ class AlertService:
                     "type": "alert",
                     "data": alert.model_dump(),
                 })
+
+        # Check anomaly score rules
+        stats = anomaly_detector.get_stats()
+        anomaly_fired = await self.check_anomaly_score(stats.get("anomaly_score", 0.0))
+        for alert in anomaly_fired:
+            logger.info("Anomaly alert fired: %s", alert.message)
+            await ws_manager.broadcast({
+                "type": "alert",
+                "data": alert.model_dump(),
+            })
 
 
 # Module-level singleton

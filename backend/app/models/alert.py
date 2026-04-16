@@ -18,6 +18,7 @@ class AlertCondition(str, enum.Enum):
     ATTACK_TYPE = "attack_type"        # attack of specific type detected
     PRICE_CHANGE = "price_change"      # asset price change > threshold %
     BBOX = "bbox"                      # attack destination inside lat/lng bounding box
+    ANOMALY_SCORE = "anomaly_score"    # anomaly score exceeds threshold
 
 
 class AlertRule(Base):

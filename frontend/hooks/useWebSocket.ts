@@ -17,6 +17,7 @@ interface UseWebSocketReturn {
   anomalyScore: number;
   notifications: AlertNotification[];
   replaySyncPosition: number | null;
+  reconnectedAt: number | null;
   sendMessage: (type: string, data?: unknown) => void;
   clearHistory: () => void;
   clearNotifications: () => void;
@@ -31,6 +32,7 @@ export function useWebSocket(): UseWebSocketReturn {
   const [anomalyScore, setAnomalyScore] = useState(0);
   const [notifications, setNotifications] = useState<AlertNotification[]>([]);
   const [replaySyncPosition, setReplaySyncPosition] = useState<number | null>(null);
+  const [reconnectedAt, setReconnectedAt] = useState<number | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
@@ -65,6 +67,10 @@ export function useWebSocket(): UseWebSocketReturn {
       ws.onopen = () => {
         if (!mountedRef.current) return;
         setIsConnected(true);
+        // If this is a reconnect (not the very first connection), signal it
+        if (reconnectAttemptRef.current > 0) {
+          setReconnectedAt(Date.now());
+        }
         reconnectAttemptRef.current = 0;
       };
 
@@ -203,6 +209,7 @@ export function useWebSocket(): UseWebSocketReturn {
     anomalyScore,
     notifications,
     replaySyncPosition,
+    reconnectedAt,
     sendMessage,
     clearHistory,
     clearNotifications,

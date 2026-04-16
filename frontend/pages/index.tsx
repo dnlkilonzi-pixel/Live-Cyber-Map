@@ -43,7 +43,7 @@ type RightPanel = "intel" | "financial" | "risk" | null;
 type LeftPanel = "dashboard" | "layers" | null;
 
 export default function Home() {
-  const { attacks, stats, isConnected, isAnomaly, anomalyScore, sendMessage, notifications, clearNotifications, markAllRead, replaySyncPosition } =
+  const { attacks, stats, isConnected, isAnomaly, anomalyScore, sendMessage, notifications, clearNotifications, markAllRead, replaySyncPosition, reconnectedAt } =
     useWebSocket();
 
   const isMobile = useIsMobile();
@@ -84,6 +84,15 @@ export default function Home() {
   const [lastSeenAttackCount, setLastSeenAttackCount] = useState(0);
   const newAttackCount = Math.max(0, attacks.length - lastSeenAttackCount);
   const handleViewFeed = () => setLastSeenAttackCount(attacks.length);
+
+  // WS reconnect toast
+  const [showReconnectToast, setShowReconnectToast] = useState(false);
+  useEffect(() => {
+    if (!reconnectedAt) return;
+    setShowReconnectToast(true);
+    const t = setTimeout(() => setShowReconnectToast(false), 4000);
+    return () => clearTimeout(t);
+  }, [reconnectedAt]);
 
   useEffect(() => { applyTheme(theme); persist.saveTheme(theme); }, [theme]); // eslint-disable-line react-hooks/exhaustive-deps -- persist is a stable object from usePersistSettings (useCallback references)
 
@@ -510,6 +519,23 @@ export default function Home() {
             initialStatus={intelligence.ollamaStatus}
           />
         )}
+
+        {/* ── WebSocket reconnect toast ─────────────────────── */}
+        <AnimatePresence>
+          {showReconnectToast && (
+            <motion.div
+              key="reconnect-toast"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 40 }}
+              transition={{ duration: 0.3 }}
+              className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-lg border border-green-600/60 bg-black/80 backdrop-blur-sm shadow-lg pointer-events-none"
+            >
+              <span className="w-2 h-2 rounded-full bg-green-400" style={{ boxShadow: "0 0 6px #4ade80" }} />
+              <span className="text-xs text-green-300 font-mono tracking-wide">Reconnected to live feed</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </>
   );
